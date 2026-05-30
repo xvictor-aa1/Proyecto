@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recepción de Equipos — Coord. Informática · Alcaldía Carlos Arvelo</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --azul:#003B6F;--azul2:#0055A5;
+  --dorado:#C8961E;--dorado2:#E8B030;
+  --mano:#000080;--negro:#111;
+  --gris-bg:#DEDEDE;--papel:#FEFEFE;
+  --borde:#888;--borde2:#BBB;
+  font-family:'Source Sans 3',sans-serif;
+}
+html,body{min-height:100%;background:var(--gris-bg);color:var(--negro)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#9BBBDA;border-radius:3px}
+.shell{display:flex;flex-direction:column;min-height:100vh}
+
+/* USER BAR */
+.user-bar{background:#071e3d;color:#fff;padding:5px 20px;display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.user-bar a{color:var(--dorado);text-decoration:none;font-weight:700}
+
+/* TOPBAR */
+.topbar{background:var(--azul);color:#fff;display:flex;align-items:center;gap:12px;
+  padding:0 24px;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.topbar::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--dorado),var(--dorado2),var(--dorado))}
+.topbar-logo,.topbar-logo2{width:46px;height:46px;border-radius:50%;border:2px solid var(--dorado);
+  overflow:hidden;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.topbar-logo img,.topbar-logo2 img{width:100%;height:100%;object-fit:contain}
+.topbar-txt{flex:1}
+.topbar-txt h1{font-family:'Crimson Pro',serif;font-size:16px;font-weight:700}
+.topbar-txt p{font-size:10px;opacity:.7;margin-top:1px}
+.topbar-clock{text-align:right;font-size:10px;opacity:.8;line-height:1.7}
+.topbar-clock b{display:block;font-size:13px;color:var(--dorado2)}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--dorado),var(--dorado2),var(--dorado))}
+
+/* TABS */
+.tabs{background:var(--azul2);display:flex;padding:0 24px;gap:2px}
+.tab-btn{background:none;border:none;color:rgba(255,255,255,.65);
+  font-family:'Source Sans 3',sans-serif;font-size:13px;font-weight:600;
+  padding:9px 18px;cursor:pointer;border-bottom:3px solid transparent;
+  transition:all .15s;display:flex;align-items:center;gap:6px}
+.tab-btn:hover{color:#fff;background:rgba(255,255,255,.08)}
+.tab-btn.active{color:#fff;border-bottom-color:var(--dorado2);background:rgba(255,255,255,.1)}
+
+/* MAIN */
+.main{flex:1;padding:20px 24px;max-width:1280px;width:100%;margin:0 auto}
+.seccion{display:none;animation:aparecer .2s ease}
+.seccion.active{display:block}
+@keyframes aparecer{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* PAPEL */
+.papel{background:var(--papel);box-shadow:0 4px 20px rgba(0,0,0,.15);
+  border:1px solid #CCC;padding:28px 32px;margin-bottom:20px}
+
+/* CABECERA FORMULARIO */
+.form-header{display:flex;align-items:center;border-bottom:2.5px solid var(--negro);
+  padding-bottom:10px;margin-bottom:14px;gap:10px}
+.form-logo{width:80px;height:80px;border-radius:50%;border:2.5px solid var(--dorado);
+  overflow:hidden;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.form-logo img{width:100%;height:100%;object-fit:contain}
+.form-logo-info{width:64px;height:64px;border-radius:50%;border:2px solid var(--azul2);
+  overflow:hidden;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.form-logo-info img{width:100%;height:100%;object-fit:contain}
+.form-title-area{flex:1;text-align:center}
+.form-title-area h2{font-family:'Crimson Pro',serif;font-size:26px;font-weight:700}
+.form-title-area p{font-family:'Crimson Pro',serif;font-style:italic;font-size:14px;color:var(--azul2)}
+.form-numero-box{border:1.5px solid var(--negro);padding:6px 12px;font-size:13px;
+  font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:4px;flex-direction:column}
+.form-numero-box input{border:none;border-bottom:1.5px dotted var(--negro);
+  font-size:14px;font-weight:700;color:var(--mano);width:90px;
+  font-family:'Courier New',monospace;background:transparent;outline:none;text-align:center}
+.btn-regen{background:none;border:1px solid #aaa;border-radius:4px;cursor:pointer;
+  padding:1px 5px;font-size:10px;color:#555}
+.btn-regen:hover{background:#eee}
+
+/* DATOS GRID */
+.datos-grid{display:grid;grid-template-columns:2fr 1fr;gap:0;border:1.5px solid var(--borde);margin-bottom:14px}
+.datos-grid .campo{display:flex;align-items:center;border-bottom:1px solid var(--borde2);padding:5px 8px;gap:6px}
+.datos-grid .campo:last-child{border-bottom:none}
+.datos-grid .campo.span2{grid-column:span 2}
+.campo-lbl{font-weight:700;font-size:13px;white-space:nowrap;flex-shrink:0}
+.campo-val{flex:1;border:none;border-bottom:1.5px dotted var(--borde);
+  font-size:13px;color:var(--mano);font-family:'Courier New',monospace;
+  font-weight:700;background:transparent;outline:none;width:100%}
+.campo-val:focus{border-bottom-color:var(--azul2)}
+
+/* AUTOCOMPLETE */
+.autocomplete-wrap{position:relative;flex:1;display:flex}
+.autocomplete-wrap input{width:100%}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:#fff;
+  border:1.5px solid var(--azul2);border-top:none;border-radius:0 0 6px 6px;
+  max-height:200px;overflow-y:auto;z-index:300;display:none;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+.autocomplete-list.open{display:block}
+.ac-item{padding:7px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #EEE}
+.ac-item:hover{background:#EEF4FF;color:var(--azul)}
+.ac-empty{padding:7px 10px;font-size:12px;color:#999}
+
+/* CHEQUEO */
+.seccion-titulo{font-family:'Crimson Pro',serif;font-size:18px;font-weight:700;
+  text-align:center;text-decoration:underline;margin:14px 0 8px}
+.chequeo-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1.5px solid var(--negro);margin-bottom:14px}
+.chk-col{padding:8px 10px;border-right:1.5px solid var(--negro)}
+.chk-col:last-child{border-right:none}
+.chk-title{font-weight:700;font-size:12px;text-align:center;border-bottom:1px solid var(--negro);
+  padding-bottom:4px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:6px}
+.chk-item{display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;cursor:pointer;padding:1px 0}
+.chk-extra{border:none;border-bottom:1px dotted #999;width:60px;font-size:11px;
+  color:var(--mano);font-family:'Courier New',monospace;background:transparent;outline:none}
+
+/* TRABAJOS */
+.trabajos-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;
+  border:1.5px solid var(--negro);padding:8px 12px;margin-bottom:14px}
+.trab-item{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0}
+.trab-item input{width:14px;height:14px}
+
+/* OTROS */
+.otros-area{width:100%;min-height:70px;border:1px solid var(--borde2);border-radius:4px;
+  padding:8px;font-size:13px;font-family:'Source Sans 3',sans-serif;resize:vertical;color:var(--mano)}
+
+/* ESTADO */
+.estado-sel{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.estado-opt{padding:5px 14px;border-radius:20px;border:1.5px solid var(--borde2);
+  font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:#F8F8F8}
+.estado-opt.sel-Recibido{border-color:var(--azul);background:var(--azul);color:#fff}
+.estado-opt.sel-En\ Diagnóstico{border-color:var(--dorado);background:var(--dorado);color:#fff}
+.estado-opt.sel-En\ Reparación{border-color:#EA580C;background:#EA580C;color:#fff}
+.estado-opt.sel-Listo{border-color:#15803D;background:#15803D;color:#fff}
+.estado-opt.sel-Entregado{border-color:#475569;background:#475569;color:#fff}
+
+/* FIRMAS */
+.firmas-section{border-top:2px solid var(--negro);margin-top:14px;padding-top:10px}
+.firmas-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.firma-box{text-align:center;padding:8px}
+.firma-linea{border-bottom:1.5px solid var(--negro);margin:20px auto 6px;width:80%}
+.firma-lbl{font-size:12px;font-weight:700;color:#444}
+.firma-nombre{font-size:14px;font-weight:700;color:var(--mano);margin-top:4px;font-family:'Courier New',monospace}
+.pie-texto{text-align:center;font-size:10px;color:#666;margin-top:10px;font-style:italic}
+
+/* BOTONES */
+.btn-row{display:flex;gap:10px;justify-content:flex-end;margin-bottom:20px;flex-wrap:wrap}
+.btn{padding:9px 22px;border-radius:6px;border:none;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .15s;font-family:'Source Sans 3',sans-serif;
+  display:inline-flex;align-items:center;gap:6px}
+.btn-azul{background:var(--azul);color:#fff}.btn-azul:hover{background:var(--azul2)}
+.btn-dorado{background:var(--dorado);color:#fff}.btn-dorado:hover{background:var(--dorado2);color:#111}
+.btn-gris{background:#E2E8F0;color:#333}.btn-gris:hover{background:#CBD5E1}
+.btn-rojo{background:#C0392B;color:#fff}.btn-rojo:hover{background:#A93226}
+.btn-verde{background:#15803D;color:#fff}.btn-verde:hover{background:#166534}
+.btn-xs{padding:4px 8px;font-size:11px}
+
+/* MODAL PDF */
+.modal-pdf-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;
+  display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-pdf-bg.open{opacity:1;pointer-events:all}
+.modal-pdf{background:#fff;border-radius:10px;padding:28px 32px;min-width:340px;max-width:440px;
+  box-shadow:0 8px 40px rgba(0,0,0,.25);transform:translateY(16px);transition:transform .2s}
+.modal-pdf-bg.open .modal-pdf{transform:none}
+.modal-pdf h3{font-size:18px;font-weight:700;color:var(--azul);margin-bottom:8px}
+.modal-pdf p{font-size:13px;color:#555;margin-bottom:20px;line-height:1.5}
+.modal-pdf-btns{display:flex;gap:10px;flex-wrap:wrap}
+
+/* LISTADO */
+.panel-ctrl{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px 20px;margin-bottom:16px}
+.panel-ctrl h3{font-size:14px;font-weight:700;color:var(--azul);margin-bottom:12px}
+.filtros{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.filtro-grp{display:flex;flex-direction:column;gap:4px}
+.filtro-grp label{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px}
+.filtro-grp input,.filtro-grp select{border:1.5px solid var(--borde2);border-radius:5px;
+  padding:6px 10px;font-size:13px;font-family:'Source Sans 3',sans-serif;outline:none}
+.filtro-grp input:focus,.filtro-grp select:focus{border-color:var(--azul2)}
+.tabla-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--azul);color:#fff;padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap}
+tbody tr:nth-child(even){background:#F8FAFF}
+tbody tr:hover{background:#EEF4FF}
+td{padding:7px 10px;border-bottom:1px solid #EEE;vertical-align:middle}
+.badge{padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;display:inline-block;white-space:nowrap}
+.bg-azul{background:#DBEAFE;color:#1E40AF}
+.bg-dorado{background:#FEF3C7;color:#92400E}
+.bg-naranja{background:#FFEDD5;color:#9A3412}
+.bg-verde{background:#DCFCE7;color:#166534}
+.bg-gris{background:#F1F5F9;color:#475569}
+.mono{font-family:'Courier New',monospace;font-size:11px}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat{background:#fff;border-radius:8px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,.07);position:relative;overflow:hidden}
+.stat .n{font-size:32px;font-weight:700;line-height:1}
+.stat .l{font-size:11px;color:#888;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.stat .bar{position:absolute;bottom:0;left:0;right:0;height:3px}
+.s-azul .n{color:var(--azul)}.s-azul .bar{background:var(--azul)}
+.s-dorado .n{color:var(--dorado)}.s-dorado .bar{background:var(--dorado)}
+.s-verde .n{color:#15803D}.s-verde .bar{background:#15803D}
+.s-rojo .n{color:#C0392B}.s-rojo .bar{background:#C0392B}
+
+/* RESUMEN */
+.res-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.res-tabla{width:100%;border-collapse:collapse;font-size:12px}
+.res-tabla th{background:#EEF2F7;padding:6px 10px;text-align:left;font-size:11px}
+.res-tabla td{padding:5px 10px;border-bottom:1px solid #EEE}
+.mini-bar{height:6px;background:var(--azul2);border-radius:3px;transition:width .4s}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;
+  font-size:13px;font-weight:700;background:#1E293B;color:#fff;
+  box-shadow:0 4px 20px rgba(0,0,0,.3);transform:translateY(80px);
+  transition:transform .3s;z-index:999;max-width:360px}
+#toast.show{transform:none}
+#toast.t-ok{background:#15803D}#toast.t-err{background:#C0392B}#toast.t-info{background:var(--azul)}
+
+/* MODAL CONFIRM */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;
+  display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:#fff;border-radius:10px;padding:28px 32px;min-width:320px;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.25)}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:8px;color:var(--azul)}
+.modal p{font-size:13px;color:#555;margin-bottom:20px;line-height:1.5}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
+.empty{text-align:center;padding:48px 20px;color:#94A3B8}
+.empty-ico{font-size:48px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- BARRA USUARIO -->
+<div class="user-bar">
+  <span>🔐 <b id="user-nombre"></b> &nbsp;|&nbsp; Rol: <b id="user-rol"></b></span>
+  <a href="/logout">Cerrar sesión ×</a>
+</div>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-logo"><img id="tb-logo-alc" src="" alt="Alcaldía" style="display:none"></div>
+  <div class="topbar-txt">
+    <h1>Alcaldía Bolivariana del Municipio Carlos Arvelo</h1>
+    <p>Sistema de Recepción de Equipos · Coordinación de Informática · Estado Carabobo</p>
+  </div>
+  <div class="topbar-clock">
+    <b id="clk-h">--:--:--</b>
+    <span id="clk-f">cargando...</span>
+  </div>
+  <div class="topbar-logo2"><img id="tb-logo-info" src="" alt="Informática" style="display:none"></div>
+</header>
+
+<!-- TABS -->
+<nav class="tabs">
+  <button class="tab-btn active" onclick="tab('formulario',this)">📋 Nuevo Reporte</button>
+  <button class="tab-btn" onclick="tab('listado',this)">🗂️ Listado</button>
+  <button class="tab-btn" onclick="tab('servicio',this)">🔧 Servicio Técnico</button>
+  <button class="tab-btn" onclick="tab('resumen',this)">📊 Resumen Trimestral</button>
+</nav>
+
+<main class="main">
+
+<!-- ═══ TAB 1 — FORMULARIO ═══ -->
+<div class="seccion active" id="sec-formulario">
+  <div class="papel" id="hoja-formulario">
+
+    <!-- Cabecera igual al formato físico -->
+    <div class="form-header">
+      <div class="form-logo"><img id="frm-logo-alc" src="" alt="" style="display:none"></div>
+      <div class="form-title-area">
+        <h2>Recepción de Equipos</h2>
+        <p>Coordinación de Informática</p>
+      </div>
+      <div class="form-logo-info"><img id="frm-logo-info" src="" alt="" style="display:none"></div>
+      <div class="form-numero-box">
+        <span style="font-size:11px">RRE-N°.</span>
+        <input type="text" id="f-numero" title="Editable si es necesario">
+        <button class="btn-regen" onclick="cargarSiguienteNumero()" title="Regenerar número">↺ auto</button>
+      </div>
+    </div>
+
+    <!-- DATOS -->
+    <div class="datos-grid">
+      <div class="campo span2">
+        <span class="campo-lbl">Departamento:</span>
+        <div class="autocomplete-wrap">
+          <input class="campo-val" type="text" id="f-departamento"
+                 placeholder="Buscar departamento..." autocomplete="off"
+                 oninput="acFilter('dpto',this.value)" onfocus="acOpen('dpto')"
+                 onblur="setTimeout(()=>acClose('dpto'),200)">
+          <div class="autocomplete-list" id="ac-dpto"></div>
+        </div>
+      </div>
+      <div class="campo">
+        <span class="campo-lbl">Fecha:</span>
+        <input class="campo-val" type="text" id="f-fecha" maxlength="8" placeholder="dd-mm-aa">
+      </div>
+      <div class="campo span2">
+        <span class="campo-lbl">Código de Bienes Municipales:</span>
+        <input class="campo-val" type="text" id="f-codigo-bienes" placeholder="Código de bienes municipales">
+      </div>
+      <div class="campo">
+        <span class="campo-lbl">Usuario del Equipo:</span>
+        <input class="campo-val" type="text" id="f-usuario-equipo" placeholder="Nombre del usuario">
+      </div>
+      <div class="campo">
+        <span class="campo-lbl">Equipo:</span>
+        <input class="campo-val" type="text" id="f-equipo"
+               placeholder="CPU / Laptop / Impresora..."
+               oninput="mostrarChequeo(detectarTipoEquipo(this.value))">
+      </div>
+      <div class="campo">
+        <span class="campo-lbl">Marca:</span>
+        <input class="campo-val" type="text" id="f-marca" placeholder="HP, Dell...">
+      </div>
+      <div class="campo">
+        <span class="campo-lbl">Modelo:</span>
+        <input class="campo-val" type="text" id="f-modelo" placeholder="Sempron, OptiPlex...">
+      </div>
+      <div class="campo">
+        <span class="campo-lbl">Serial:</span>
+        <input class="campo-val" type="text" id="f-serial" placeholder="N° de serial">
+      </div>
+    </div>
+
+    <!-- CHEQUEO PREVIO DINÁMICO -->
+    <div class="seccion-titulo" id="chequeo-titulo" style="display:none">Chequeo Previo</div>
+
+    <div class="chequeo-grid" id="chk-panel-comp" style="display:none">
+      <div class="chk-col" style="grid-column:span 3">
+        <div class="chk-title">🖥️ Computador (CPU) — Accesorios recibidos</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 16px">
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="Antena Wifi"> Antena Wifi</label>
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="DVD"> DVD</label>
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="Ram"> Ram
+            <input class="chk-extra" type="text" id="chk-ram-val" placeholder="ej: 4 GB"></label>
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="Disco duro"> Disco duro
+            <input class="chk-extra" type="text" id="chk-hdd-val" placeholder="ej: 500 GB"></label>
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="Cable de Poder"> Cable de Poder</label>
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="Tarjeta de red"> Tarjeta de red</label>
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="Drivers"> Drivers</label>
+          <label class="chk-item"><input type="checkbox" data-cat="comp" value="Otros"> Otros</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="chequeo-grid" id="chk-panel-lap" style="display:none">
+      <div class="chk-col" style="grid-column:span 3">
+        <div class="chk-title">💻 Laptop — Accesorios recibidos</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 16px">
+          <label class="chk-item"><input type="checkbox" data-cat="lap" value="Maletín"> Maletín</label>
+          <label class="chk-item"><input type="checkbox" data-cat="lap" value="Batería"> Batería</label>
+          <label class="chk-item"><input type="checkbox" data-cat="lap" value="Ram"> Ram
+            <input class="chk-extra" type="text" id="chk-lap-ram-val" placeholder="ej: 8 GB"></label>
+          <label class="chk-item"><input type="checkbox" data-cat="lap" value="Disco duro"> Disco duro
+            <input class="chk-extra" type="text" id="chk-lap-hdd-val" placeholder="ej: 256 GB"></label>
+          <label class="chk-item"><input type="checkbox" data-cat="lap" value="Cable de Poder"> Cable de Poder</label>
+          <label class="chk-item"><input type="checkbox" data-cat="lap" value="Drivers"> Drivers</label>
+          <label class="chk-item"><input type="checkbox" data-cat="lap" value="Otros"> Otros</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="chequeo-grid" id="chk-panel-imp" style="display:none">
+      <div class="chk-col" style="grid-column:span 3">
+        <div class="chk-title">🖨️ Impresora — Accesorios recibidos</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 16px">
+          <label class="chk-item"><input type="checkbox" data-cat="imp" value="C. de comunicación"> C. de comunicación</label>
+          <label class="chk-item"><input type="checkbox" data-cat="imp" value="Tapas"> Tapas</label>
+          <label class="chk-item"><input type="checkbox" data-cat="imp" value="Cartuchos"> Cartuchos</label>
+          <label class="chk-item"><input type="checkbox" data-cat="imp" value="Cable de Poder"> Cable de Poder</label>
+          <label class="chk-item"><input type="checkbox" data-cat="imp" value="Drivers"> Drivers</label>
+          <label class="chk-item"><input type="checkbox" data-cat="imp" value="Otros"> Otros</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRABAJOS REALIZADOS -->
+    <div class="seccion-titulo">Trabajos Realizados</div>
+    <div class="trabajos-grid">
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Chequeo de Equipo"> Chequeo de Equipo</label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Instalación de impresora"> Instalación de impresora
+        <input class="chk-extra" type="text" placeholder="modelo"></label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Formateo de disco duro"> Formateo de disco duro</label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Instalación de impresora en red"> Instalación de impresora en red
+        <input class="chk-extra" type="text" placeholder="nombre red"></label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Respaldo de Data"> Respaldo de Data</label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Instalación de anti virus y actualización"> Instalación de anti virus y actualización
+        <input class="chk-extra" type="text" placeholder="versión"></label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Instalación de sistema operativo"> Instalación de sistema operativo</label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Restauración de la data"> Restauración de la data</label>
+      <label class="trab-item"><input type="checkbox" name="trabajo" value="Instalación de office"> Instalación de office
+        <input class="chk-extra" type="text" placeholder="versión"></label>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <span class="campo-lbl">Otros:</span>
+      <textarea class="otros-area" id="f-otros" placeholder="Observaciones adicionales..."></textarea>
+    </div>
+
+    <!-- ESTADO -->
+    <div style="margin-bottom:14px">
+      <span class="campo-lbl">Estado del reporte:</span>
+      <div class="estado-sel" id="estado-sel">
+        <span class="estado-opt sel-Recibido" onclick="setEstado('Recibido')">Recibido</span>
+        <span class="estado-opt" onclick="setEstado('En Diagnóstico')">En Diagnóstico</span>
+        <span class="estado-opt" onclick="setEstado('En Reparación')">En Reparación</span>
+        <span class="estado-opt" onclick="setEstado('Listo')">Listo</span>
+        <span class="estado-opt" onclick="setEstado('Entregado')">Entregado</span>
+      </div>
+    </div>
+
+    <!-- FIRMAS -->
+    <div class="firmas-section">
+      <div class="firmas-grid">
+        <div class="firma-box">
+          <div class="firma-linea"></div>
+          <div class="firma-lbl">Recibe Conforme</div>
+          <input class="campo-val" type="text" id="f-nombre-usuario" placeholder="Nombre completo" style="text-align:center;margin-top:6px">
+          <input class="campo-val" type="text" id="f-cedula-usuario" placeholder="C.I." style="text-align:center;margin-top:4px;font-size:12px">
+        </div>
+        <div class="firma-box">
+          <div class="firma-linea"></div>
+          <div class="firma-lbl">Soporte Técnico</div>
+          <div class="autocomplete-wrap" style="justify-content:center;margin-top:6px">
+            <input class="campo-val" type="text" id="f-tecnico"
+                   placeholder="Técnico responsable" autocomplete="off"
+                   style="text-align:center"
+                   oninput="acFilter('tec',this.value)" onfocus="acOpen('tec')"
+                   onblur="setTimeout(()=>acClose('tec'),200)">
+            <div class="autocomplete-list" id="ac-tec"></div>
+          </div>
+        </div>
+      </div>
+      <p class="pie-texto">Dirección: A.v Miranda Palacio Municipal "Alcaldía Bolivariana del Municipio Carlos Arvelo"<br>
+      Telf. Fax: 0245-3412069 | 04144153893 | 04262410794</p>
+    </div>
+
+    <input type="hidden" id="edit-id" value="">
+    <input type="hidden" id="f-estado" value="Recibido">
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-gris" onclick="limpiarForm()">🗑 Limpiar</button>
+    <button class="btn btn-azul" onclick="guardarReporte()">💾 Guardar Reporte</button>
+  </div>
+</div><!-- /sec-formulario -->
+
+<!-- ═══ TAB 2 — LISTADO ═══ -->
+<div class="seccion" id="sec-listado">
+  <div class="stats-row">
+    <div class="stat s-azul"><div class="n" id="st-total">0</div><div class="l">Total Reportes</div><div class="bar"></div></div>
+    <div class="stat s-dorado"><div class="n" id="st-activos">0</div><div class="l">En Proceso</div><div class="bar"></div></div>
+    <div class="stat s-verde"><div class="n" id="st-listos">0</div><div class="l">Listos</div><div class="bar"></div></div>
+    <div class="stat s-rojo"><div class="n" id="st-entregados">0</div><div class="l">Entregados</div><div class="bar"></div></div>
+  </div>
+  <div class="panel-ctrl">
+    <h3>🔍 Filtros</h3>
+    <div class="filtros">
+      <div class="filtro-grp">
+        <label>Buscar</label>
+        <input type="text" id="l-buscar" placeholder="N°, modelo, serial..." oninput="cargarListado()" style="min-width:200px">
+      </div>
+      <div class="filtro-grp">
+        <label>Departamento</label>
+        <select id="l-dpto" onchange="cargarListado()" style="min-width:170px">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="filtro-grp">
+        <label>Trimestre</label>
+        <select id="l-tri" onchange="cargarListado()">
+          <option value="">Todos</option>
+          <option value="T1">T1 (Ene-Mar)</option>
+          <option value="T2">T2 (Abr-Jun)</option>
+          <option value="T3">T3 (Jul-Sep)</option>
+          <option value="T4">T4 (Oct-Dic)</option>
+        </select>
+      </div>
+      <div class="filtro-grp">
+        <label>Año</label>
+        <select id="l-anio" onchange="cargarListado()"></select>
+      </div>
+      <button class="btn btn-gris" onclick="cargarListado()" style="margin-top:18px">🔄 Actualizar</button>
+      <button class="btn btn-dorado" onclick="descargarListadoPDF()" style="margin-top:18px">⬇ PDF Lista</button>
+    </div>
+  </div>
+  <div class="tabla-wrap">
+    <table>
+      <thead><tr>
+        <th>N° Reporte</th><th>Fecha</th><th>Departamento</th>
+        <th>Equipo</th><th>Marca / Modelo</th><th>Serial</th>
+        <th>Cód. Bienes</th><th>Estado</th><th>Acciones</th>
+      </tr></thead>
+      <tbody id="tbody-listado"></tbody>
+    </table>
+  </div>
+</div><!-- /sec-listado -->
+
+<!-- ═══ TAB 3 — SERVICIO TÉCNICO ═══ -->
+<div class="seccion" id="sec-servicio">
+  <div class="panel-ctrl">
+    <h3>🔧 Registro de Servicio Técnico</h3>
+    <div class="filtros" style="align-items:flex-end;gap:12px">
+      <div class="filtro-grp">
+        <label>N° Orden</label>
+        <input type="text" id="srv-numero" style="min-width:130px" placeholder="RS-001/26">
+      </div>
+      <div class="filtro-grp">
+        <label>Departamento</label>
+        <input type="text" id="srv-dpto" style="min-width:200px" placeholder="Departamento">
+      </div>
+      <div class="filtro-grp">
+        <label>Fecha</label>
+        <input type="text" id="srv-fecha" style="min-width:100px" placeholder="dd-mm-aa">
+      </div>
+      <button class="btn btn-azul" onclick="guardarServicio()">➕ Registrar</button>
+      <button class="btn btn-dorado" onclick="imprimirBlancoServicio()">🖨 Imprimir Hoja</button>
+    </div>
+  </div>
+  <div class="tabla-wrap">
+    <table>
+      <thead><tr><th>N° Orden</th><th>Departamento</th><th>Fecha</th><th>Registrado</th><th>Acciones</th></tr></thead>
+      <tbody id="tbody-servicio"></tbody>
+    </table>
+  </div>
+</div><!-- /sec-servicio -->
+
+<!-- ═══ TAB 4 — RESUMEN ═══ -->
+<div class="seccion" id="sec-resumen">
+  <div class="panel-ctrl">
+    <h3>📊 Resumen Trimestral</h3>
+    <div class="filtros">
+      <div class="filtro-grp">
+        <label>Trimestre</label>
+        <select id="res-tri">
+          <option value="T1">T1 (Ene-Mar)</option>
+          <option value="T2">T2 (Abr-Jun)</option>
+          <option value="T3">T3 (Jul-Sep)</option>
+          <option value="T4">T4 (Oct-Dic)</option>
+        </select>
+      </div>
+      <div class="filtro-grp">
+        <label>Año</label>
+        <select id="res-anio"></select>
+      </div>
+      <button class="btn btn-azul" onclick="cargarResumen()" style="margin-top:18px">🔍 Consultar</button>
+      <button class="btn btn-dorado" onclick="descargarResumenPDF()" style="margin-top:18px">⬇ Descargar PDF</button>
+    </div>
+  </div>
+  <div id="res-contenido">
+    <div class="empty"><div class="empty-ico">📊</div><p>Selecciona trimestre y año, luego clic en Consultar</p></div>
+  </div>
+</div><!-- /sec-resumen -->
+
+</main><!-- /main -->
+
+<!-- MODAL CONFIRMAR ELIMINAR -->
+<div class="modal-bg" id="modal-del">
+  <div class="modal">
+    <h3>⚠️ Eliminar reporte</h3>
+    <p id="modal-del-txt">¿Confirmas eliminar este reporte? Esta acción no se puede deshacer.</p>
+    <div class="modal-btns">
+      <button class="btn btn-gris" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-rojo" id="modal-del-btn">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+</div><!-- /shell -->
+
+<script>
+// ── RELOJ ────────────────────────────────────────────────────────────────────
+function actualizarReloj(){
+  const d=new Date();
+  document.getElementById('clk-h').textContent=d.toLocaleTimeString('es-VE');
+  document.getElementById('clk-f').textContent=d.toLocaleDateString('es-VE',
+    {weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+}
+actualizarReloj();
+setInterval(actualizarReloj,1000);
+
+// ── TOAST ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg,tipo='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='show t-'+tipo;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.className='',3200);
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function tab(id,btn){
+  document.querySelectorAll('.seccion').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='listado') cargarListado();
+  if(id==='servicio'){cargarServicio();initSrvFecha();}
+  if(id==='resumen') iniciarResumen();
+}
+
+// ── LOGOS ────────────────────────────────────────────────────────────────────
+async function cargarLogos(){
+  try{
+    const r=await fetch('/api/logos');
+    const d=await r.json();
+    const pares=[
+      ['tb-logo-alc','frm-logo-alc'],
+      ['tb-logo-info','frm-logo-info'],
+    ];
+    if(d.alcaldia) pares[0].forEach(id=>{const el=document.getElementById(id);if(el){el.src=d.alcaldia;el.style.display='block';}});
+    if(d.informatica) pares[1].forEach(id=>{const el=document.getElementById(id);if(el){el.src=d.informatica;el.style.display='block';}});
+  }catch(e){}
+}
+
+// ── USUARIO/ROL ───────────────────────────────────────────────────────────────
+async function cargarUsuario(){
+  try{
+    const r=await fetch('/api/me');
+    const d=await r.json();
+    if(d.logged_in){
+      document.getElementById('user-nombre').textContent=d.nombre||'';
+      document.getElementById('user-rol').textContent=d.rol==='superadmin'?'Super Admin':'Técnico';
+    }
+  }catch(e){}
+}
+
+// ── AUTOCOMPLETE ──────────────────────────────────────────────────────────────
+const acData={dpto:[],tec:[]};
+function acFilter(key,val){
+  const list=document.getElementById('ac-'+key);
+  const items=acData[key].filter(x=>x.toLowerCase().includes(val.toLowerCase()));
+  if(!val||!items.length){list.innerHTML=val?'<div class="ac-empty">Sin resultados</div>':'';list.classList.toggle('open',!!val);return;}
+  list.innerHTML=items.map(x=>`<div class="ac-item" onmousedown="acSelect('${key}','${x}')">${x}</div>`).join('');
+  list.classList.add('open');
+}
+function acSelect(key,val){
+  const field=key==='dpto'?'f-departamento':'f-tecnico';
+  document.getElementById(field).value=val;
+  acClose(key);
+}
+function acOpen(key){
+  const el=document.getElementById('ac-'+key);
+  if(el&&el.innerHTML) el.classList.add('open');
+}
+function acClose(key){document.getElementById('ac-'+key)?.classList.remove('open');}
+
+async function cargarListas(){
+  const [dr,tr]=await Promise.all([fetch('/api/departamentos'),fetch('/api/tecnicos')]);
+  acData.dpto=await dr.json();
+  acData.tec=await tr.json();
+  // Llenar select de departamentos en listado
+  const sel=document.getElementById('l-dpto');
+  acData.dpto.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);});
+}
+
+// ── CHEQUEO DINÁMICO ──────────────────────────────────────────────────────────
+const EQUIPO_MAP={cpu:'comp',computador:'comp',desktop:'comp',laptop:'lap',
+  notebook:'lap',portatil:'lap',impresora:'imp',printer:'imp',multifuncional:'imp'};
+function detectarTipoEquipo(v){
+  v=v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  for(const[k,p] of Object.entries(EQUIPO_MAP)){if(v.includes(k))return p;}
+  return null;
+}
+function mostrarChequeo(tipo){
+  const tit=document.getElementById('chequeo-titulo');
+  ['comp','lap','imp'].forEach(p=>{
+    const el=document.getElementById('chk-panel-'+p);
+    if(el) el.style.display=(tipo===p)?'':'none';
+    if(tipo!==p) document.querySelectorAll(`input[data-cat="${p}"]`).forEach(c=>c.checked=false);
+  });
+  if(tit) tit.style.display=tipo?'':'none';
+}
+
+// ── NÚMERO REPORTE ────────────────────────────────────────────────────────────
+async function cargarSiguienteNumero(){
+  try{
+    const r=await fetch('/api/siguiente_numero');
+    const d=await r.json();
+    document.getElementById('f-numero').value=d.numero;
+  }catch(e){}
+}
+
+// ── FECHA ─────────────────────────────────────────────────────────────────────
+function fechaHoy(){
+  const d=new Date();
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const aa=String(d.getFullYear()).slice(-2);
+  return `${dd}-${mm}-${aa}`;
+}
+
+// ── ESTADO ────────────────────────────────────────────────────────────────────
+function setEstado(e){
+  document.getElementById('f-estado').value=e;
+  document.querySelectorAll('.estado-opt').forEach(el=>{
+    el.className='estado-opt'+(el.textContent.trim()===e?' sel-'+e:'');
+  });
+}
+
+// ── GUARDAR REPORTE ───────────────────────────────────────────────────────────
+function g(id){return document.getElementById(id)?.value?.trim()||'';}
+
+async function guardarReporte(){
+  const comp=[...document.querySelectorAll('input[data-cat="comp"]:checked')].map(c=>{
+    if(c.value==='Ram'){const v=document.getElementById('chk-ram-val')?.value?.trim();return v?`Ram (${v})`:'Ram';}
+    if(c.value==='Disco duro'){const v=document.getElementById('chk-hdd-val')?.value?.trim();return v?`Disco duro (${v})`:'Disco duro';}
+    return c.value;
+  });
+  const lap=[...document.querySelectorAll('input[data-cat="lap"]:checked')].map(c=>{
+    if(c.value==='Ram'){const v=document.getElementById('chk-lap-ram-val')?.value?.trim();return v?`Ram (${v})`:'Ram';}
+    if(c.value==='Disco duro'){const v=document.getElementById('chk-lap-hdd-val')?.value?.trim();return v?`Disco duro (${v})`:'Disco duro';}
+    return c.value;
+  });
+  const imp=[...document.querySelectorAll('input[data-cat="imp"]:checked')].map(c=>c.value);
+  const trabajos=[...document.querySelectorAll('input[name="trabajo"]:checked')].map(c=>c.value);
+  const estado=g('f-estado')||'Recibido';
+  const payload={
+    numero:g('f-numero'), departamento:g('f-departamento'),
+    codigo_bienes:g('f-codigo-bienes'),
+    usuario_equipo:g('f-usuario-equipo'), fecha:g('f-fecha')||fechaHoy(),
+    tecnico:g('f-tecnico'), equipo:g('f-equipo'),
+    marca:g('f-marca'), modelo:g('f-modelo'), serial:g('f-serial'),
+    chequeo_computador:comp, chequeo_laptop:lap, chequeo_impresora:imp,
+    trabajos, otros:g('f-otros'),
+    nombre_usuario:g('f-nombre-usuario'), cedula_usuario:g('f-cedula-usuario'),
+    estado
+  };
+  if(!payload.numero){toast('El número de reporte es obligatorio','err');return;}
+  const editId=g('edit-id');
+  const url=editId?`/api/reportes/${editId}`:'/api/reportes';
+  const method=editId?'PUT':'POST';
+  try{
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d.ok||d.id){
+      toast(editId?'Reporte actualizado ✓':'Reporte guardado ✓','ok');
+      const rid=editId||d.id;
+      limpiarForm();
+      // Preguntar si descargar PDF
+      if(confirm('¿Descargar PDF del reporte?')){window.open('/api/pdf/'+rid,'_blank');}
+    } else {toast(d.error||'Error al guardar','err');}
+  }catch(e){toast('Error de conexión','err');}
+}
+
+function limpiarForm(){
+  ['f-numero','f-departamento','f-codigo-bienes','f-usuario-equipo',
+   'f-fecha','f-tecnico','f-equipo','f-marca','f-modelo','f-serial',
+   'f-otros','f-nombre-usuario','f-cedula-usuario','edit-id'].forEach(id=>{
+    const el=document.getElementById(id);if(el) el.value='';
+  });
+  document.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);
+  ['chk-ram-val','chk-hdd-val','chk-lap-ram-val','chk-lap-hdd-val'].forEach(id=>{
+    const el=document.getElementById(id);if(el) el.value='';
+  });
+  document.querySelectorAll('.chk-extra').forEach(e=>e.value='');
+  mostrarChequeo(null);
+  setEstado('Recibido');
+  document.getElementById('f-estado').value='Recibido';
+  cargarSiguienteNumero();
+  document.getElementById('f-fecha').value=fechaHoy();
+}
+
+// ── LISTADO ────────────────────────────────────────────────────────────────────
+async function cargarListado(){
+  const buscar=document.getElementById('l-buscar')?.value||'';
+  const dpto=document.getElementById('l-dpto')?.value||'';
+  const tri=document.getElementById('l-tri')?.value||'';
+  const anio=document.getElementById('l-anio')?.value||'';
+  let url=`/api/reportes?buscar=${encodeURIComponent(buscar)}&departamento=${encodeURIComponent(dpto)}&trimestre=${tri}&anio=${anio}`;
+  try{
+    const r=await fetch(url);
+    const rows=await r.json();
+    // Stats
+    document.getElementById('st-total').textContent=rows.length;
+    document.getElementById('st-activos').textContent=rows.filter(r=>['Recibido','En Diagnóstico','En Reparación'].includes(r.estado)).length;
+    document.getElementById('st-listos').textContent=rows.filter(r=>r.estado==='Listo').length;
+    document.getElementById('st-entregados').textContent=rows.filter(r=>r.estado==='Entregado').length;
+    // Tabla
+    const tb=document.getElementById('tbody-listado');
+    if(!rows.length){tb.innerHTML='<tr><td colspan="9" class="empty"><div class="empty-ico">📭</div><p>No hay reportes</p></td></tr>';return;}
+    const estadoBadge={
+      'Recibido':'bg-azul','En Diagnóstico':'bg-dorado',
+      'En Reparación':'bg-naranja','Listo':'bg-verde','Entregado':'bg-gris'
+    };
+    const esAdmin=document.getElementById('user-rol')?.textContent==='Super Admin';
+    tb.innerHTML=rows.map(r=>`
+      <tr>
+        <td class="mono"><b>${r.numero||''}</b></td>
+        <td>${r.fecha||''}</td>
+        <td>${r.departamento||''}</td>
+        <td>${r.equipo||''}</td>
+        <td><b>${r.marca||''}</b> ${r.modelo||''}</td>
+        <td class="mono">${r.serial||''}</td>
+        <td>${r.codigo_bienes||''}</td>
+        <td><span class="badge ${estadoBadge[r.estado]||'bg-gris'}">${r.estado||''}</span></td>
+        <td>
+          <button class="btn btn-dorado btn-xs" onclick="descargarPDF(${r.id})">📄 PDF</button>
+          <button class="btn btn-azul btn-xs" onclick="editarReporte(${r.id})">✏️</button>
+          ${esAdmin?`<button class="btn btn-rojo btn-xs" onclick="confirmarEliminar(${r.id},'${r.numero}')">🗑</button>`:''}
+        </td>
+      </tr>`).join('');
+  }catch(e){toast('Error cargando listado','err');}
+}
+
+function descargarPDF(id){window.open('/api/pdf/'+id,'_blank');}
+function descargarListadoPDF(){
+  const buscar=document.getElementById('l-buscar')?.value||'';
+  const dpto=document.getElementById('l-dpto')?.value||'';
+  const tri=document.getElementById('l-tri')?.value||'';
+  const anio=document.getElementById('l-anio')?.value||'';
+  window.open(`/api/pdf_listado?buscar=${encodeURIComponent(buscar)}&departamento=${encodeURIComponent(dpto)}&trimestre=${tri}&anio=${anio}`,'_blank');
+}
+
+async function editarReporte(id){
+  try{
+    const r=await fetch('/api/reportes/'+id);
+    const d=await r.json();
+    // Llenar campos
+    ['numero','departamento','codigo_bienes','usuario_equipo','fecha',
+     'tecnico','equipo','marca','modelo','serial','otros','nombre_usuario','cedula_usuario'].forEach(k=>{
+      const el=document.getElementById('f-'+k.replace('_','-'));
+      if(el) el.value=d[k]||'';
+    });
+    document.getElementById('f-codigo-bienes').value=d.codigo_bienes||'';
+    document.getElementById('edit-id').value=id;
+    setEstado(d.estado||'Recibido');
+    // Chequeos
+    mostrarChequeo(detectarTipoEquipo(d.equipo||''));
+    const comp=JSON.parse(d.chequeo_computador||'[]');
+    const lap=JSON.parse(d.chequeo_laptop||'[]');
+    const imp=JSON.parse(d.chequeo_impresora||'[]');
+    document.querySelectorAll('input[data-cat="comp"]').forEach(c=>{
+      c.checked=comp.some(v=>v===c.value||v.startsWith(c.value+' ('));
+      if(c.value==='Ram'){const m=comp.find(v=>v.startsWith('Ram ('));if(m){const e=document.getElementById('chk-ram-val');if(e)e.value=m.slice(4,-1);}}
+      if(c.value==='Disco duro'){const m=comp.find(v=>v.startsWith('Disco duro ('));if(m){const e=document.getElementById('chk-hdd-val');if(e)e.value=m.slice(12,-1);}}
+    });
+    document.querySelectorAll('input[data-cat="lap"]').forEach(c=>{
+      c.checked=lap.some(v=>v===c.value||v.startsWith(c.value+' ('));
+      if(c.value==='Ram'){const m=lap.find(v=>v.startsWith('Ram ('));if(m){const e=document.getElementById('chk-lap-ram-val');if(e)e.value=m.slice(4,-1);}}
+      if(c.value==='Disco duro'){const m=lap.find(v=>v.startsWith('Disco duro ('));if(m){const e=document.getElementById('chk-lap-hdd-val');if(e)e.value=m.slice(12,-1);}}
+    });
+    document.querySelectorAll('input[data-cat="imp"]').forEach(c=>{c.checked=imp.includes(c.value);});
+    const trabajos=JSON.parse(d.trabajos||'[]');
+    document.querySelectorAll('input[name="trabajo"]').forEach(c=>{c.checked=trabajos.some(v=>v===c.value||v.startsWith(c.value));});
+    // Ir al formulario
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.querySelectorAll('.seccion').forEach(s=>s.classList.remove('active'));
+    document.getElementById('sec-formulario').classList.add('active');
+    window.scrollTo(0,0);
+    toast('Reporte cargado para edición','info');
+  }catch(e){toast('Error cargando reporte','err');}
+}
+
+// MODAL ELIMINAR
+let delId=null;
+function confirmarEliminar(id,num){
+  delId=id;
+  document.getElementById('modal-del-txt').textContent=`¿Eliminar el reporte N° ${num}? Esta acción no se puede deshacer.`;
+  document.getElementById('modal-del').classList.add('open');
+  document.getElementById('modal-del-btn').onclick=async()=>{
+    try{
+      const r=await fetch('/api/reportes/'+delId,{method:'DELETE'});
+      const d=await r.json();
+      cerrarModal();
+      if(d.ok){toast('Reporte eliminado','ok');cargarListado();}
+      else toast(d.error||'Error al eliminar','err');
+    }catch(e){toast('Error de conexión','err');}
+  };
+}
+function cerrarModal(){document.getElementById('modal-del').classList.remove('open');}
+document.getElementById('modal-del').addEventListener('click',e=>{if(e.target===e.currentTarget)cerrarModal();});
+
+// ── SERVICIO TÉCNICO ──────────────────────────────────────────────────────────
+function initSrvFecha(){
+  const el=document.getElementById('srv-fecha');
+  if(el&&!el.value) el.value=fechaHoy();
+}
+
+async function cargarServicio(){
+  try{
+    const r=await fetch('/api/reporte_servicio');
+    const rows=await r.json();
+    const tb=document.getElementById('tbody-servicio');
+    if(!rows.length){
+      tb.innerHTML='<tr><td colspan="5" class="empty"><div class="empty-ico">🔧</div><p>Sin registros de servicio</p></td></tr>';
+      return;
+    }
+    tb.innerHTML=rows.map(r=>`
+      <tr>
+        <td class="mono"><b>${r.numero||''}</b></td>
+        <td>${r.departamento||''}</td>
+        <td>${r.fecha||''}</td>
+        <td style="font-size:11px;color:#888">${(r.fecha_registro||'').split('.')[0]}</td>
+        <td><button class="btn btn-rojo btn-xs" onclick="eliminarServicio(${r.id})">🗑</button></td>
+      </tr>`).join('');
+    // Cargar siguiente número
+    const nr=await fetch('/api/siguiente_numero_servicio');
+    const nd=await nr.json();
+    document.getElementById('srv-numero').value=nd.numero;
+  }catch(e){toast('Error cargando servicio','err');}
+}
+
+async function guardarServicio(){
+  const num=document.getElementById('srv-numero')?.value?.trim();
+  const dpto=document.getElementById('srv-dpto')?.value?.trim();
+  const fecha=document.getElementById('srv-fecha')?.value?.trim()||fechaHoy();
+  if(!num){toast('El número de orden es obligatorio','err');return;}
+  try{
+    const r=await fetch('/api/reporte_servicio',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({numero:num,departamento:dpto,fecha})});
+    const d=await r.json();
+    if(d.ok){toast('Orden registrada ✓','ok');document.getElementById('srv-dpto').value='';cargarServicio();}
+    else toast(d.error||'Error','err');
+  }catch(e){toast('Error de conexión','err');}
+}
+
+async function eliminarServicio(id){
+  if(!confirm('¿Eliminar esta orden de servicio?'))return;
+  try{
+    await fetch('/api/reporte_servicio/'+id,{method:'DELETE'});
+    toast('Eliminado','ok');cargarServicio();
+  }catch(e){toast('Error','err');}
+}
+
+function imprimirBlancoServicio(){window.open('/api/pdf_servicio_blank','_blank');}
+
+// ── RESUMEN TRIMESTRAL ────────────────────────────────────────────────────────
+function iniciarResumen(){
+  const anioSel=document.getElementById('res-anio');
+  if(!anioSel.options.length){
+    const anioActual=new Date().getFullYear();
+    for(let a=anioActual;a>=anioActual-4;a--){
+      const o=document.createElement('option');o.value=a;o.textContent=a;
+      if(a===anioActual)o.selected=true;
+      anioSel.appendChild(o);
+    }
+  }
+  // Seleccionar trimestre actual
+  const mes=new Date().getMonth()+1;
+  const tri=mes<=3?'T1':mes<=6?'T2':mes<=9?'T3':'T4';
+  document.getElementById('res-tri').value=tri;
+}
+
+async function cargarResumen(){
+  const tri=document.getElementById('res-tri')?.value||'T1';
+  const anio=document.getElementById('res-anio')?.value||new Date().getFullYear();
+  try{
+    const r=await fetch(`/api/resumen?trimestre=${tri}&anio=${anio}`);
+    const d=await r.json();
+    const cont=document.getElementById('res-contenido');
+    if(!d.total){
+      cont.innerHTML='<div class="empty"><div class="empty-ico">📭</div><p>Sin datos para '+tri+' '+anio+'</p></div>';
+      return;
+    }
+    function tablaRes(titulo,datos){
+      if(!datos||!datos.length)return '';
+      const filas=datos.map(([n,c])=>{
+        const pct=d.total?Math.round(c/d.total*100):0;
+        return `<tr><td>${n||'—'}</td><td><b>${c}</b></td>
+          <td style="width:120px"><div class="mini-bar" style="width:${Math.min(pct,100)}%"></div></td>
+          <td style="font-size:11px;color:#888">${pct}%</td></tr>`;
+      }).join('');
+      return `<div style="background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.07);overflow:hidden;margin-bottom:12px">
+        <div style="background:var(--azul);color:#fff;padding:8px 14px;font-size:13px;font-weight:700">${titulo}</div>
+        <table class="res-tabla"><thead><tr><th>Descripción</th><th>Cant.</th><th colspan="2">Distribución</th></tr></thead>
+        <tbody>${filas}</tbody></table></div>`;
+    }
+    cont.innerHTML=`
+      <div style="background:#fff;border-radius:8px;padding:16px 20px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.07)">
+        <div style="font-size:13px;color:#888;margin-bottom:4px">Total de reportes — ${tri} ${anio}</div>
+        <div style="font-size:42px;font-weight:700;color:var(--azul)">${d.total}</div>
+      </div>
+      <div class="res-cols">
+        ${tablaRes('📁 Por Departamento',d.dptos)}
+        ${tablaRes('🖥️ Por Tipo de Equipo',d.equipos)}
+      </div>
+      <div class="res-cols">
+        ${tablaRes('⚙️ Por Marca / Modelo',d.modelos)}
+        ${tablaRes('📌 Por Estado',d.estados)}
+      </div>`;
+  }catch(e){toast('Error cargando resumen','err');}
+}
+
+function descargarResumenPDF(){
+  const tri=document.getElementById('res-tri')?.value||'T1';
+  const anio=document.getElementById('res-anio')?.value||new Date().getFullYear();
+  window.open(`/api/pdf_resumen?trimestre=${tri}&anio=${anio}`,'_blank');
+}
+
+// ── AÑOS EN FILTROS ────────────────────────────────────────────────────────────
+function iniciarFiltroAnios(){
+  const anioActual=new Date().getFullYear();
+  ['l-anio'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    const o0=document.createElement('option');o0.value='';o0.textContent='Todos';sel.appendChild(o0);
+    for(let a=anioActual;a>=anioActual-4;a--){
+      const o=document.createElement('option');o.value=a;o.textContent=a;
+      if(a===anioActual)o.selected=true;
+      sel.appendChild(o);
+    }
+  });
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',async()=>{
+  await cargarLogos();
+  await cargarUsuario();
+  await cargarListas();
+  iniciarFiltroAnios();
+  cargarSiguienteNumero();
+  document.getElementById('f-fecha').value=fechaHoy();
+  document.getElementById('f-estado').value='Recibido';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acceso — Sistema de Reportes</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    min-height:100vh;
+    background:linear-gradient(135deg,#0a2647 0%,#1a4a8a 50%,#0a2647 100%);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Segoe UI',Arial,sans-serif;
+  }
+  .card{
+    background:#fff;border-radius:16px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.4);
+    padding:40px 36px;width:380px;
+    text-align:center;
+  }
+  .logos{display:flex;justify-content:center;align-items:center;gap:16px;margin-bottom:20px}
+  .logos img{height:64px;object-fit:contain}
+  h1{font-size:1.4rem;color:#0a2647;margin-bottom:4px;font-weight:700}
+  h2{font-size:0.9rem;color:#1a4a8a;margin-bottom:28px;font-weight:400}
+  .campo{position:relative;margin-bottom:20px;text-align:left}
+  .campo label{display:block;font-size:0.85rem;color:#555;margin-bottom:6px;font-weight:600}
+  .campo input{
+    width:100%;padding:12px 16px;font-size:1rem;
+    border:2px solid #dde3f0;border-radius:8px;outline:none;
+    transition:border-color .2s;letter-spacing:2px;
+  }
+  .campo input:focus{border-color:#1a4a8a}
+  .toggle-pass{
+    position:absolute;right:12px;bottom:12px;
+    background:none;border:none;cursor:pointer;
+    font-size:1.1rem;color:#888;
+  }
+  .btn-login{
+    width:100%;padding:13px;font-size:1rem;font-weight:700;
+    background:linear-gradient(90deg,#0a2647,#1a4a8a);
+    color:#fff;border:none;border-radius:8px;cursor:pointer;
+    transition:opacity .2s;letter-spacing:1px;
+  }
+  .btn-login:hover{opacity:.88}
+  .error{
+    background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb;
+    border-radius:6px;padding:10px;font-size:.88rem;margin-top:14px;display:none
+  }
+  .pie{margin-top:22px;font-size:.75rem;color:#aaa}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logos">
+    <img id="logo-alc" src="" alt="Alcaldía">
+    <img id="logo-inf" src="" alt="Informática">
+  </div>
+  <h1>Sistema de Reportes</h1>
+  <h2>Coordinación de Informática · Alcaldía Carlos Arvelo</h2>
+
+  <div class="campo">
+    <label>Clave de acceso</label>
+    <input type="password" id="clave" placeholder="Ingresa tu clave"
+           onkeydown="if(event.key==='Enter')ingresar()">
+    <button class="toggle-pass" onclick="togglePass()" title="Mostrar/ocultar">👁</button>
+  </div>
+
+  <button class="btn-login" onclick="ingresar()">INGRESAR</button>
+  <div class="error" id="err"></div>
+  <p class="pie">Coordinación de Informática &copy; 2026</p>
+</div>
+
+<script>
+function togglePass(){
+  const i=document.getElementById('clave');
+  i.type=i.type==='password'?'text':'password';
+}
+async function ingresar(){
+  const clave=document.getElementById('clave').value.trim();
+  const err=document.getElementById('err');
+  err.style.display='none';
+  if(!clave){err.textContent='Escribe tu clave';err.style.display='block';return;}
+  const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clave})});
+  const d=await r.json();
+  if(d.ok){window.location.href='/';}
+  else{err.textContent=d.error||'Clave incorrecta';err.style.display='block';}
+}
+// Cargar logos
+fetch('/api/logos').then(r=>r.json()).then(d=>{
+  if(d.alcaldia) document.getElementById('logo-alc').src=d.alcaldia;
+  if(d.informatica) document.getElementById('logo-inf').src=d.informatica;
+});
+</script>
+</body>
+</html>
