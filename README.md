@@ -6,11 +6,11 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  INSTALAR (solo la primera vez, en el equipo SERVIDOR)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  1. Instalar Python desde: https://www.python.org/downloads/
-     (marcar la opción "Add Python to PATH")
+  1. Ejecutar el instalador Instalar.bat, el cual descargara Python
+  y sus respectivos modulos de forma automatica, necesario para la ejecucion del Sistema.
 
-  2. Abrir CMD y ejecutar:
-     pip install flask reportlab pillow
+  2. Abrir y probar:
+  Ejecutar INICIAR.bat, para comprobar que funciona correctamente.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  ARRANCAR EL SERVIDOR (equipo principal)
