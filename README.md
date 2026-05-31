@@ -1,5 +1,5 @@
 ╔══════════════════════════════════════════════════════════════╗
-║   SISTEMA DE RECEPCIÓN DE EQUIPOS v5.0 — MODO RED           ║
+║   SISTEMA DE RECEPCIÓN DE EQUIPOS v5.0 — MODO RED            ║
 ║   Coordinación de Informática · Alcaldía Carlos Arvelo       ║
 ╚══════════════════════════════════════════════════════════════╝
 
