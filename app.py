@@ -12,7 +12,6 @@ from database import init_db, get_db, crear_usuario
 from modulos.auth import auth_bp
 # Modulo de funcion de auditorias
 from modulos.auditoria import auditoria_bp
-app.register_blueprint(auditoria_bp, url_prefix='/api')
 # Sistema de Reportes
 from modulos.reportes import reportes_bp 
 # Sistme del Servicio de Reportes
@@ -25,6 +24,7 @@ app.secret_key = SECRET_KEY
 app.register_blueprint(auth_bp)
 app.register_blueprint(reportes_bp, url_prefix='/api')
 app.register_blueprint(servicios_bp, url_prefix='/api')
+app.register_blueprint(auditoria_bp, url_prefix='/api')
 
 if __name__ == "__main__":
     init_db()
