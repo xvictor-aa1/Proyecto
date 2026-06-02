@@ -1,0 +1,429 @@
+# pdf/generator.py
+from config import LOGO_ALCALDIA, LOGO_INFO
+from database import get_db
+from reportlab.lib.pagesizes import letter, A4, landscape
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImg)
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+import io, json, datetime
+
+def get_logo_img(path, w, h):
+    if path.exists():
+        return RLImg(str(path), w, h)
+    return ""
+
+# Generador de PDF del Sistema de Reportes
+def generar_pdf(r):
+    buf=io.BytesIO()
+    doc=SimpleDocTemplate(buf, pagesize=letter,
+                          leftMargin=1.5*cm, rightMargin=1.5*cm,
+                          topMargin=1.2*cm, bottomMargin=1.2*cm)
+    W,H=letter; ancho=W-3*cm
+    negro=colors.black
+    azul_titulo=colors.HexColor("#3D1A00")
+    azul_sub=colors.HexColor("#1a4a8a")
+    gris_borde=colors.HexColor("#888888")
+
+    def es(n,**kw):
+        b={"fontName":"Helvetica","fontSize":9,"leading":11,"textColor":negro}
+        b.update(kw); return ParagraphStyle(n,**b)
+
+    story=[]
+    logo_alc  = get_logo_img(LOGO_ALCALDIA, 2.8*cm, 2.8*cm)
+    logo_info = get_logo_img(LOGO_INFO, 2.0*cm, 2.0*cm)
+
+    num_box = Table([[Paragraph(f"<b>N°.</b>",es("nb",fontSize=9)),
+                      Paragraph(f"<b>{r.get('numero','')}</b>",es("nv",fontSize=11,textColor=azul_sub))]],
+                    colWidths=[1.1*cm, 3*cm])
+    num_box.setStyle(TableStyle([
+        ("BOX",(0,0),(-1,-1),1.5,negro),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING",(0,0),(-1,-1),5),
+    ]))
+
+    hdr=Table([[
+        logo_alc,
+        [Paragraph("<b>Recepción de Equipos</b>",
+                   es("t1",fontSize=24,alignment=TA_CENTER,leading=30,fontName="Helvetica-Bold",textColor=azul_titulo)),
+         Paragraph("Coordinación de Informática",
+                   es("t2",fontSize=12,textColor=azul_sub,alignment=TA_CENTER,leading=16))],
+        [logo_info, Spacer(1,0.2*cm), num_box]
+    ]], colWidths=[3*cm, ancho-7*cm, 4*cm])
+    hdr.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("BOX",(0,0),(-1,-1),2,negro),
+        ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ("LEFTPADDING",(1,0),(1,0),8),("RIGHTPADDING",(1,0),(1,0),8),
+        ("ALIGN",(2,0),(2,0),"CENTER"),
+    ]))
+    story+=[hdr, Spacer(1,0.3*cm)]
+
+    border_st = TableStyle([
+        ("BOX",(0,0),(-1,-1),1,negro),
+        ("INNERGRID",(0,0),(-1,-1),0.5,gris_borde),
+        ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ("LEFTPADDING",(0,0),(-1,-1),5),
+    ])
+
+    def campo(lbl, val, w_lbl=3*cm, w_val=None, bold_lbl=True):
+        wv = w_val or (ancho - w_lbl)
+        fn = "Helvetica-Bold" if bold_lbl else "Helvetica"
+        t=Table([[Paragraph(f"<b>{lbl}</b>",es("cl",fontName=fn,fontSize=10)),
+                  Paragraph(str(val or ""),es("cv",fontSize=10,textColor=azul_sub))]],
+                colWidths=[w_lbl, wv])
+        t.setStyle(border_st)
+        return t
+
+    def campo2(l1,v1,l2,v2, w1=3*cm, w2=3*cm):
+        mitad=ancho/2
+        t=Table([[Paragraph(f"<b>{l1}</b>",es("l1",fontName="Helvetica-Bold",fontSize=10)),
+                  Paragraph(str(v1 or ""),es("v1",fontSize=10,textColor=azul_sub)),
+                  Paragraph(f"<b>{l2}</b>",es("l2",fontName="Helvetica-Bold",fontSize=10)),
+                  Paragraph(str(v2 or ""),es("v2",fontSize=10,textColor=azul_sub))]],
+                colWidths=[w1,mitad-w1,w2,mitad-w2])
+        t.setStyle(border_st)
+        return t
+
+    story.append(campo2("Departamento:",r.get("departamento",""),"Fecha:",r.get("fecha",""),3.2*cm,1.5*cm))
+    story.append(Spacer(1,0.05*cm))
+    story.append(campo("código de bienes municipales:", r.get("codigo_bienes",""), 4.8*cm))
+    story.append(Spacer(1,0.05*cm))
+    story.append(campo2("Equipo:",r.get("equipo",""),"Marca:",r.get("marca",""),2*cm,1.8*cm))
+    story.append(Spacer(1,0.05*cm))
+    story.append(campo2("Modelo:",r.get("modelo",""),"Serial:",r.get("serial",""),2*cm,1.8*cm))
+    story.append(Spacer(1,0.3*cm))
+
+    titulo_chk=Table([[Paragraph("<b>Chequeo Previo</b>",
+                                  es("ch",fontSize=13,alignment=TA_CENTER,fontName="Helvetica-Bold"))]],
+                     colWidths=[ancho])
+    titulo_chk.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1,negro),
+                                     ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
+    story.append(titulo_chk)
+
+    comp_items=["Antena Wifi","DVD","Ram","Disco duro","Cable de Poder","Tarjeta de red","Drivers","Otros"]
+    lap_items =["Maletín","Batería","Cable de Poder","Drivers","Otros"]
+    imp_items =["C. de comunicación","Tapas","Cartuchos","Cable de Poder","Drivers","Otros"]
+    comp_marc=json.loads(r.get("chequeo_computador","[]"))
+    lap_marc =json.loads(r.get("chequeo_laptop","[]"))
+    imp_marc =json.loads(r.get("chequeo_impresora","[]"))
+
+    def lista_chk(titulo, items, marcados):
+        rows=[[Paragraph(f"<b>☐ {titulo}</b>",es("ct",fontSize=9,fontName="Helvetica-Bold",alignment=TA_CENTER))]]
+        for it in items:
+            mark="✓" if any(it in m for m in (marcados or [])) else "☐"
+            rows.append([Paragraph(f"{mark} {it}",es(f"i{it}",fontSize=8,leading=13))])
+        t=Table(rows,colWidths=[ancho/3-0.1*cm])
+        t.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1,negro),
+                                ("LINEBELOW",(0,0),(-1,0),1,negro),
+                                ("TOPPADDING",(0,0),(-1,-1),3),("LEFTPADDING",(0,0),(-1,-1),6)]))
+        return t
+
+    chk_row=Table([[lista_chk("Computador",comp_items,comp_marc),
+                    lista_chk("Laptop",lap_items,lap_marc),
+                    lista_chk("Impresora",imp_items,imp_marc)]],
+                  colWidths=[ancho/3]*3)
+    chk_row.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),
+                                  ("BOX",(0,0),(-1,-1),1,negro),
+                                  ("INNERGRID",(0,0),(-1,-1),1,negro)]))
+    story+=[chk_row, Spacer(1,0.3*cm)]
+
+    titulo_tr=Table([[Paragraph("<b>Trabajos Realizados</b>",
+                                 es("tr",fontSize=13,alignment=TA_CENTER,fontName="Helvetica-Bold"))]],
+                    colWidths=[ancho])
+    titulo_tr.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1,negro),
+                                    ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
+    story.append(titulo_tr)
+
+    trab_todos=["Chequeo de Equipo","Formateo de disco duro","Respaldo de Data",
+                "Instalación de sistema operativo","Instalación de office",
+                "Instalación de impresora","Instalación de impresora en red",
+                "Instalación de anti virus y actualización","Restauración de la data"]
+    trab_marc=json.loads(r.get("trabajos","[]"))
+    c1=trab_todos[:5]; c2=trab_todos[5:]
+
+    def col_t(items):
+        rows=[]
+        for it in items:
+            mark="✓" if any(it in m for m in trab_marc) else "☐"
+            rows.append([Paragraph(f"{mark} {it}",es(f"tr{it}",fontSize=8,leading=14))])
+        return rows
+
+    trb=Table([[col_t(c1), col_t(c2)]],colWidths=[ancho/2]*2)
+    trb.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1,negro),
+                              ("INNERGRID",(0,0),(-1,-1),0.5,negro),
+                              ("VALIGN",(0,0),(-1,-1),"TOP"),
+                              ("TOPPADDING",(0,0),(-1,-1),4),
+                              ("LEFTPADDING",(0,0),(-1,-1),8)]))
+    story.append(trb)
+
+    story.append(Spacer(1,0.1*cm))
+    otros_t=Table([[Paragraph("<b>Otros:</b>",es("ol",fontSize=9,fontName="Helvetica-Bold")),
+                    Paragraph(str(r.get("otros","") or ""),es("ov",fontSize=9,textColor=azul_sub))]],
+                  colWidths=[1.5*cm,ancho-1.5*cm])
+    otros_t.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1,negro),
+                                  ("MINROWHEIGHT",(0,0),(0,0),1.4*cm),
+                                  ("VALIGN",(0,0),(-1,-1),"TOP"),
+                                  ("TOPPADDING",(0,0),(-1,-1),5),
+                                  ("LEFTPADDING",(0,0),(-1,-1),5)]))
+    story.append(otros_t)
+    story.append(Spacer(1,0.3*cm))
+
+    foto_box=Table([[Paragraph("",es("fb"))]],colWidths=[ancho])
+    foto_box.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1,negro),
+                                   ("MINROWHEIGHT",(0,0),(0,0),2.5*cm)]))
+    story.append(foto_box)
+    story.append(Spacer(1,0.3*cm))
+
+    firmas=Table([[
+        [Paragraph("________________________",es("f1",fontSize=8,alignment=TA_CENTER)),
+         Paragraph("Recibe Conforme",es("fl1",fontSize=9,alignment=TA_CENTER,fontName="Helvetica-Bold")),
+         Paragraph(str(r.get("nombre_usuario","")),es("fn",fontSize=9,alignment=TA_CENTER,textColor=azul_sub)),
+         Paragraph(str(r.get("cedula_usuario","")),es("fci",fontSize=8,alignment=TA_CENTER,textColor=azul_sub))],
+        [Paragraph("________________________",es("f2",fontSize=8,alignment=TA_CENTER)),
+         Paragraph("Soporte Técnico",es("fl2",fontSize=9,alignment=TA_CENTER,fontName="Helvetica-Bold")),
+         Paragraph(str(r.get("tecnico","")),es("ft",fontSize=9,alignment=TA_CENTER,textColor=azul_sub))]
+    ]],colWidths=[ancho/2]*2)
+    firmas.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),
+                                 ("TOPPADDING",(0,0),(-1,-1),10),
+                                 ("ALIGN",(0,0),(-1,-1),"CENTER")]))
+    story.append(firmas)
+    story.append(Spacer(1,0.2*cm))
+    story.append(Paragraph(
+        'Dirección: A.v Miranda Palacio Municipal "Alcaldía Bolivariana del Municipio Carlos Arvelo"',
+        es("pie",fontSize=8,textColor=colors.grey,alignment=TA_CENTER)))
+    story.append(Paragraph(
+        "Telf. Fax: 0245-3412069  |  04144153893  |  04262410794",
+        es("pie2",fontSize=7.5,textColor=colors.grey,alignment=TA_CENTER)))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+def generar_pdf_resumen(tri, anio):
+    con=get_db(); p=(tri,anio)
+    total =con.execute("SELECT COUNT(*) FROM reportes WHERE trimestre=? AND anio=?",p).fetchone()[0]
+    dptos =[(r[0],r[1]) for r in con.execute("SELECT departamento,COUNT(*) FROM reportes WHERE trimestre=? AND anio=? GROUP BY departamento ORDER BY COUNT(*) DESC",p)]
+    equipos=[(r[0],r[1]) for r in con.execute("SELECT equipo,COUNT(*) FROM reportes WHERE trimestre=? AND anio=? GROUP BY equipo ORDER BY COUNT(*) DESC",p)]
+    modelos=[(r[0]+' '+r[1],r[2]) for r in con.execute("SELECT marca,modelo,COUNT(*) FROM reportes WHERE trimestre=? AND anio=? GROUP BY marca,modelo ORDER BY COUNT(*) DESC",p)]
+    estados=[(r[0],r[1]) for r in con.execute("SELECT estado,COUNT(*) FROM reportes WHERE trimestre=? AND anio=? GROUP BY estado ORDER BY COUNT(*) DESC",p)]
+    con.close()
+
+    buf=io.BytesIO()
+    doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=1.8*cm,rightMargin=1.8*cm,topMargin=1.5*cm,bottomMargin=1.8*cm)
+    W,H=A4; ancho=W-3.6*cm
+    azul=colors.HexColor("#003B6F"); dorado=colors.HexColor("#C8961E")
+    gris=colors.HexColor("#EEF2F7")
+
+    def es(n,**kw):
+        b={"fontName":"Helvetica","fontSize":9,"leading":12,"textColor":colors.black}
+        b.update(kw); return ParagraphStyle(n,**b)
+
+    story=[]
+    logo_alc  = get_logo_img(LOGO_ALCALDIA, 2*cm, 2*cm)
+    logo_info = get_logo_img(LOGO_INFO, 1.6*cm, 1.6*cm)
+
+    ht=Table([[logo_alc,[
+        Paragraph("REPÚBLICA BOLIVARIANA DE VENEZUELA · ESTADO CARABOBO",es("h1",fontSize=7,textColor=colors.grey,alignment=TA_CENTER)),
+        Paragraph("ALCALDÍA DE CARLOS ARVELO",es("h2",fontName="Helvetica-Bold",fontSize=13,textColor=azul,alignment=TA_CENTER)),
+        Paragraph("COORDINACIÓN DE INFORMÁTICA",es("h3",fontName="Helvetica-Bold",fontSize=9,textColor=azul,alignment=TA_CENTER)),
+        Paragraph(f"RESUMEN TRIMESTRAL — {tri} {anio}",es("h4",fontName="Helvetica-Bold",fontSize=11,textColor=dorado,alignment=TA_CENTER)),
+    ],logo_info]],colWidths=[2.2*cm,ancho-4.4*cm,2.2*cm])
+    ht.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"MIDDLE"),("LINEBELOW",(0,0),(-1,0),2,dorado),("BOTTOMPADDING",(0,0),(-1,0),8)]))
+    story+=[ht,Spacer(1,.4*cm)]
+
+    tot=Table([[Paragraph(f"Total de reportes — {tri} {anio}:",es("tt",fontName="Helvetica-Bold",fontSize=11,textColor=azul)),
+                Paragraph(str(total),es("tn",fontName="Helvetica-Bold",fontSize=22,textColor=dorado))]],
+              colWidths=[ancho-2*cm,2*cm])
+    tot.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"MIDDLE"),("ALIGN",(1,0),(1,0),"CENTER"),
+                             ("BOX",(0,0),(-1,-1),1,dorado),("TOPPADDING",(0,0),(-1,-1),8),
+                             ("BOTTOMPADDING",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),10)]))
+    story+=[tot,Spacer(1,.3*cm)]
+
+    def tabla_res(titulo,datos):
+        barra=Table([[Paragraph("  "+titulo,es("s",fontName="Helvetica-Bold",fontSize=9,textColor=colors.white))]],colWidths=[ancho])
+        barra.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),azul),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
+        story.append(barra)
+        filas=[[Paragraph("<b>Descripción</b>",es("eh",textColor=azul)),Paragraph("<b>Cant.</b>",es("ec",textColor=azul)),Paragraph("<b>%</b>",es("ep",textColor=azul))]]
+        for i,(d,c) in enumerate(datos):
+            pct=f"{round(c/total*100)}%" if total else "0%"
+            filas.append([Paragraph(str(d),es(f"d{i}")),Paragraph(str(c),es(f"c{i}")),Paragraph(pct,es(f"p{i}"))])
+        t=Table(filas,colWidths=[ancho-4*cm,2*cm,2*cm])
+        t.setStyle(TableStyle([("BOX",(0,0),(-1,-1),.5,colors.HexColor("#CBD5E1")),("INNERGRID",(0,0),(-1,-1),.5,colors.HexColor("#CBD5E1")),
+                               ("BACKGROUND",(0,0),(-1,0),gris),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),("LEFTPADDING",(0,0),(-1,-1),5)]))
+        story+=[t,Spacer(1,.3*cm)]
+
+    tabla_res("REPORTES POR DEPARTAMENTO",dptos)
+    tabla_res("REPORTES POR TIPO DE EQUIPO",equipos)
+    tabla_res("REPORTES POR MARCA / MODELO",modelos)
+    tabla_res("REPORTES POR ESTADO",estados)
+    story.append(Paragraph(f"Generado: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')} — Coordinación de Informática · Alcaldía Carlos Arvelo",
+                           es("pie",fontSize=7,textColor=colors.grey,alignment=TA_CENTER)))
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+def generar_pdf_listado(rows, filtros=None):
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
+                            leftMargin=1.5*cm, rightMargin=1.5*cm,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm)
+    W, H = landscape(A4); ancho = W - 3*cm
+    azul=colors.HexColor("#003B6F"); azul2=colors.HexColor("#0055A5")
+    dorado=colors.HexColor("#C8961E"); grisF=colors.HexColor("#F8FAFF")
+    ESTADO_COL={"Recibido":colors.HexColor("#DBEAFE"),"En Diagnóstico":colors.HexColor("#FEF3C7"),
+                "En Reparación":colors.HexColor("#FFEDD5"),"Listo":colors.HexColor("#DCFCE7"),"Entregado":colors.HexColor("#F1F5F9")}
+
+    def es(n,**kw):
+        b={"fontName":"Helvetica","fontSize":8,"leading":10,"textColor":colors.black}
+        b.update(kw); return ParagraphStyle(n,**b)
+
+    story=[]
+    logo_alc  = get_logo_img(LOGO_ALCALDIA, 1.8*cm, 1.8*cm)
+    logo_info = get_logo_img(LOGO_INFO, 1.4*cm, 1.4*cm)
+
+    hdr=Table([[logo_alc,[
+        Paragraph("REPÚBLICA BOLIVARIANA DE VENEZUELA · ESTADO CARABOBO",es("h0",fontSize=7,textColor=colors.grey,alignment=TA_CENTER)),
+        Paragraph("ALCALDÍA BOLIVARIANA DEL MUNICIPIO CARLOS ARVELO",es("h1",fontName="Helvetica-Bold",fontSize=13,textColor=azul,alignment=TA_CENTER)),
+        Paragraph("COORDINACIÓN DE INFORMÁTICA",es("h2",fontName="Helvetica-Bold",fontSize=9,textColor=azul2,alignment=TA_CENTER)),
+        Paragraph("LISTADO DE REPORTES DE RECEPCIÓN DE EQUIPOS",es("h3",fontName="Helvetica-Bold",fontSize=10,textColor=dorado,alignment=TA_CENTER)),
+    ],[logo_info, Paragraph(f"Fecha: {datetime.date.today().strftime('%d/%m/%Y')}",es("hf",fontSize=8,alignment=TA_RIGHT,textColor=colors.grey))]]],
+    colWidths=[2*cm, ancho-4.5*cm, 2.5*cm])
+    hdr.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"MIDDLE"),("LINEBELOW",(0,0),(-1,0),2,dorado),("BOTTOMPADDING",(0,0),(-1,0),8)]))
+    story+=[hdr,Spacer(1,0.25*cm)]
+
+    if filtros:
+        partes=[]
+        if filtros.get("departamento"): partes.append(f"Departamento: {filtros['departamento']}")
+        if filtros.get("trimestre"):    partes.append(f"Trimestre: {filtros['trimestre']}")
+        if filtros.get("anio"):         partes.append(f"Año: {filtros['anio']}")
+        if filtros.get("buscar"):       partes.append(f'Búsqueda: "{filtros["buscar"]}"')
+        if partes:
+            story.append(Table([[Paragraph("Filtros: "+"  •  ".join(partes),es("ft",fontSize=8,textColor=azul2))]],
+                               colWidths=[ancho],style=[("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#EEF2F7")),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),("LEFTPADDING",(0,0),(-1,-1),8)]))
+            story.append(Spacer(1,0.15*cm))
+
+    story.append(Table([[Paragraph(f"Total de registros: <b>{len(rows)}</b>",es("tot",fontSize=9,textColor=azul))]],
+                       colWidths=[ancho],style=[("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),("LEFTPADDING",(0,0),(-1,-1),6)]))
+    story.append(Spacer(1,0.15*cm))
+
+    enc=[Paragraph("<b>N°</b>",es("e0",textColor=colors.white,alignment=TA_CENTER)),
+         Paragraph("<b>Fecha</b>",es("e1",textColor=colors.white,alignment=TA_CENTER)),
+         Paragraph("<b>Departamento</b>",es("e2",textColor=colors.white)),
+         Paragraph("<b>Equipo</b>",es("e3",textColor=colors.white)),
+         Paragraph("<b>Marca / Modelo</b>",es("e4",textColor=colors.white)),
+         Paragraph("<b>Serial</b>",es("e5",textColor=colors.white,alignment=TA_CENTER)),
+         Paragraph("<b>Trabajos Realizados</b>",es("e7",textColor=colors.white)),
+         Paragraph("<b>Estado</b>",es("e8",textColor=colors.white,alignment=TA_CENTER))]
+    cw=[2*cm,1.6*cm,3.5*cm,2.4*cm,3.5*cm,2.4*cm,7*cm,2.4*cm]
+    data=[enc]
+    ts=[("BACKGROUND",(0,0),(-1,0),azul),("TEXTCOLOR",(0,0),(-1,0),colors.white),
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,0),8),
+        ("TOPPADDING",(0,0),(-1,0),6),("BOTTOMPADDING",(0,0),(-1,0),6),
+        ("BOX",(0,0),(-1,-1),0.5,colors.HexColor("#CBD5E1")),
+        ("INNERGRID",(0,0),(-1,-1),0.3,colors.HexColor("#CBD5E1")),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("TOPPADDING",(0,1),(-1,-1),4),("BOTTOMPADDING",(0,1),(-1,-1),4),
+        ("LEFTPADDING",(0,0),(-1,-1),4)]
+
+    for i,row in enumerate(rows):
+        trab=json.loads(row.get("trabajos","[]"))
+        trab_txt=" / ".join(trab) if trab else "—"
+        estado=row.get("estado","—")
+        fila=[Paragraph(str(row.get("numero","")),es(f"r{i}0",fontName="Helvetica-Bold",alignment=TA_CENTER)),
+              Paragraph(str(row.get("fecha","")),es(f"r{i}1",alignment=TA_CENTER)),
+              Paragraph(str(row.get("departamento","")),es(f"r{i}2")),
+              Paragraph(str(row.get("equipo","")),es(f"r{i}3")),
+              Paragraph(f"{row.get('marca','')} {row.get('modelo','')}".strip(),es(f"r{i}4",fontName="Helvetica-Bold")),
+              Paragraph(str(row.get("serial","")),es(f"r{i}5",alignment=TA_CENTER,fontSize=7)),
+              Paragraph(trab_txt,es(f"r{i}7",fontSize=7,leading=9)),
+              Paragraph(estado,es(f"r{i}8",alignment=TA_CENTER,fontName="Helvetica-Bold",fontSize=7))]
+        data.append(fila)
+        ri=i+1
+        bg=grisF if i%2==0 else colors.white
+        ts.append(("BACKGROUND",(0,ri),(-2,ri),bg))
+        ts.append(("BACKGROUND",(7,ri),(7,ri),ESTADO_COL.get(estado,colors.white)))
+
+    tabla=Table(data,colWidths=cw,repeatRows=1)
+    tabla.setStyle(TableStyle(ts))
+    story.append(tabla)
+    story.append(Spacer(1,0.3*cm))
+    story.append(Paragraph(
+        f"Coordinación de Informática · Alcaldía Bolivariana del Municipio Carlos Arvelo · "
+        f"Estado Carabobo · Generado: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        es("pie",fontSize=7,textColor=colors.grey,alignment=TA_CENTER)))
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+def generar_pdf_servicio_blank():
+    buf=io.BytesIO()
+    doc=SimpleDocTemplate(buf,pagesize=A4,
+                          leftMargin=1*cm,rightMargin=1*cm,
+                          topMargin=1*cm,bottomMargin=1*cm)
+    W,H=A4; ancho=W-2*cm
+    negro=colors.black; azul=colors.HexColor("#003B6F")
+    dorado=colors.HexColor("#C8961E")
+
+    def es(n,**kw):
+        b={"fontName":"Helvetica","fontSize":8,"leading":10,"textColor":negro}
+        b.update(kw); return ParagraphStyle(n,**b)
+
+    def mini_reporte():
+        logo_alc  = get_logo_img(LOGO_ALCALDIA, 1.2*cm, 1.2*cm)
+        logo_info = get_logo_img(LOGO_INFO, 1*cm, 1*cm)
+        cab=Table([[
+            logo_alc,
+            [Paragraph("Reporte de Servicio Técnico",es("rt",fontSize=11,fontName="Helvetica-Bold",alignment=TA_CENTER,textColor=azul,leading=14)),
+             Paragraph("Coordinación de Informática",es("ci",fontSize=7,textColor=dorado,alignment=TA_CENTER))],
+            [logo_info, Paragraph("N°._______",es("nn",fontSize=9,fontName="Helvetica-Bold",alignment=TA_LEFT))]
+        ]],colWidths=[1.4*cm, ancho-3.2*cm, 1.8*cm])
+        cab.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"MIDDLE"),("LINEBELOW",(0,0),(-1,0),1.5,negro),
+                                  ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
+        line=colors.HexColor("#AAAAAA")
+        def dos_lineas(l1,l2,aw1=2.5*cm,aw2=2.5*cm):
+            mitad=ancho/2
+            t=Table([[Paragraph(f"<b>{l1}</b>",es("l1",fontSize=8)),Paragraph("",es("v1")),
+                      Paragraph(f"<b>{l2}</b>",es("l2",fontSize=8)),Paragraph("",es("v2"))]],
+                    colWidths=[aw1,mitad-aw1,aw2,mitad-aw2])
+            t.setStyle(TableStyle([("LINEBELOW",(1,0),(1,0),0.8,line),("LINEBELOW",(3,0),(3,0),0.8,line),
+                                    ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),("LEFTPADDING",(0,0),(-1,-1),2)]))
+            return t
+        det=Table([[Paragraph("<b>Fallas:</b>",es("dt",fontSize=8)),Paragraph("",es("dv"))]],
+                  colWidths=[1.5*cm,ancho-1.5*cm])
+        det.setStyle(TableStyle([("BOX",(0,0),(-1,-1),0.5,line),("MINROWHEIGHT",(0,0),(0,0),1.4*cm),
+                                  ("VALIGN",(0,0),(-1,-1),"TOP"),("TOPPADDING",(0,0),(-1,-1),3),("LEFTPADDING",(0,0),(-1,-1),3)]))
+        trab=Table([[Paragraph("<b>Trabajos Realizados:</b>",es("tw",fontSize=8)),Paragraph("",es("twv"))]],
+                   colWidths=[3.5*cm,ancho-3.5*cm])
+        trab.setStyle(TableStyle([("BOX",(0,0),(-1,-1),0.5,line),("MINROWHEIGHT",(0,0),(0,0),1.4*cm),
+                                   ("VALIGN",(0,0),(-1,-1),"TOP"),("TOPPADDING",(0,0),(-1,-1),3),("LEFTPADDING",(0,0),(-1,-1),3)]))
+        firma=Table([[Paragraph("_______________________",es("f1",fontSize=7,alignment=TA_CENTER)),
+                      Paragraph("_______________________",es("f2",fontSize=7,alignment=TA_CENTER))]],colWidths=[ancho/2]*2)
+        firma.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),8),("ALIGN",(0,0),(-1,-1),"CENTER")]))
+        firma2=Table([[Paragraph("Recibe Conforme",es("fl1",fontSize=7,alignment=TA_CENTER,textColor=colors.grey)),
+                       Paragraph("Soporte Técnico",es("fl2",fontSize=7,alignment=TA_CENTER,textColor=colors.grey))]],colWidths=[ancho/2]*2)
+        firma2.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),0),("ALIGN",(0,0),(-1,-1),"CENTER")]))
+        pie=Table([[Paragraph('Dirección: A.v Miranda Palacio Municipal "Alcaldía Bolivariana del Municipio Carlos Arvelo"',
+                               es("pie",fontSize=7,alignment=TA_CENTER,textColor=colors.grey))]],colWidths=[ancho])
+
+        inner=[cab,Spacer(1,0.1*cm),dos_lineas("Departamento:","Fecha:",3*cm,1.5*cm),
+               dos_lineas("Equipo:","Marca:",2*cm,1.5*cm),dos_lineas("Modelo:","Serial:",2*cm,1.5*cm),
+               Spacer(1,0.1*cm),det,Spacer(1,0.05*cm),trab,Spacer(1,0.1*cm),firma,firma2,pie]
+        wrapper=Table([[inner]],colWidths=[ancho])
+        wrapper.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1.5,negro),
+                                      ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+                                      ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6)]))
+        return wrapper
+
+    story=[]
+    for i in range(3):
+        story.append(mini_reporte())
+        if i < 2:
+            story.append(Spacer(1,0.3*cm))
+            story.append(Table([[Paragraph("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -",
+                                           es("sep",fontSize=7,textColor=colors.grey,alignment=TA_CENTER))]],colWidths=[ancho]))
+            story.append(Spacer(1,0.3*cm))
+    doc.build(story)
+    buf.seek(0)
+    return buf
