@@ -18,5 +18,5 @@ echo  NO CIERRES ESTA VENTANA mientras uses el sistema.
 echo =====================================================
 echo.
 start "" http://localhost:5000
-python app.py
+py app.py
 pause

@@ -27,9 +27,10 @@
   .campo input{
     width:100%;padding:12px 16px;font-size:1rem;
     border:2px solid #dde3f0;border-radius:8px;outline:none;
-    transition:border-color .2s;letter-spacing:2px;
+    transition:border-color .2s;
   }
   .campo input:focus{border-color:#1a4a8a}
+  .campo input[type=password]{letter-spacing:2px}
   .toggle-pass{
     position:absolute;right:12px;bottom:12px;
     background:none;border:none;cursor:pointer;
@@ -40,6 +41,7 @@
     background:linear-gradient(90deg,#0a2647,#1a4a8a);
     color:#fff;border:none;border-radius:8px;cursor:pointer;
     transition:opacity .2s;letter-spacing:1px;
+    margin-top:6px;
   }
   .btn-login:hover{opacity:.88}
   .error{
@@ -47,6 +49,8 @@
     border-radius:6px;padding:10px;font-size:.88rem;margin-top:14px;display:none
   }
   .pie{margin-top:22px;font-size:.75rem;color:#aaa}
+  /* Validación visual */
+  input:invalid{border-color:#e74c3c}
 </style>
 </head>
 <body>
@@ -59,8 +63,16 @@
   <h2>Coordinación de Informática · Alcaldía Carlos Arvelo</h2>
 
   <div class="campo">
-    <label>Clave de acceso</label>
-    <input type="password" id="clave" placeholder="Ingresa tu clave"
+    <label>Cédula</label>
+    <input type="text" id="cedula" placeholder="12345678" pattern="\d{8}" maxlength="8"
+           inputmode="numeric" required
+           oninput="this.value=this.value.replace(/\D/g,'').slice(0,8)"
+           onkeydown="if(event.key==='Enter')document.getElementById('password').focus()">
+  </div>
+
+  <div class="campo">
+    <label>Contraseña</label>
+    <input type="password" id="password" placeholder="Mínimo 7 caracteres" minlength="7" required
            onkeydown="if(event.key==='Enter')ingresar()">
     <button class="toggle-pass" onclick="togglePass()" title="Mostrar/ocultar">👁</button>
   </div>
@@ -72,19 +84,49 @@
 
 <script>
 function togglePass(){
-  const i=document.getElementById('clave');
-  i.type=i.type==='password'?'text':'password';
+  const p=document.getElementById('password');
+  p.type=p.type==='password'?'text':'password';
 }
+
+function validar(){
+  const cedula=document.getElementById('cedula').value.trim();
+  const password=document.getElementById('password').value;
+  if(!/^\d{8}$/.test(cedula)){
+    return 'La cédula debe tener 8 dígitos numéricos.';
+  }
+  if(password.length < 7){
+    return 'La contraseña debe tener al menos 7 caracteres.';
+  }
+  return null;
+}
+
 async function ingresar(){
-  const clave=document.getElementById('clave').value.trim();
   const err=document.getElementById('err');
   err.style.display='none';
-  if(!clave){err.textContent='Escribe tu clave';err.style.display='block';return;}
-  const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clave})});
+
+  const msg = validar();
+  if(msg){
+    err.textContent=msg; err.style.display='block';
+    return;
+  }
+
+  const cedula = document.getElementById('cedula').value.trim();
+  const password = document.getElementById('password').value;
+
+  const r=await fetch('/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({cedula, password})
+  });
   const d=await r.json();
-  if(d.ok){window.location.href='/';}
-  else{err.textContent=d.error||'Clave incorrecta';err.style.display='block';}
+  if(d.ok){
+    window.location.href='/';
+  } else {
+    err.textContent=d.error||'Credenciales incorrectas';
+    err.style.display='block';
+  }
 }
+
 // Cargar logos
 fetch('/api/logos').then(r=>r.json()).then(d=>{
   if(d.alcaldia) document.getElementById('logo-alc').src=d.alcaldia;

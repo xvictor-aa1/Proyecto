@@ -1,10 +1,11 @@
 """
 Sistema de Recepción de Equipos
 Coordinación de Informática - Alcaldía Bolivariana de Carlos Arvelo
-VERSION 5.0
+VERSION - User login
 """
 from flask import Flask, render_template, request, jsonify, send_file, abort, session, redirect, url_for
 import sqlite3, os, io, datetime, json, base64
+from werkzeug.security import generate_password_hash, check_password_hash
 from pathlib import Path
 from functools import wraps
 
@@ -16,13 +17,6 @@ DB_PATH       = BASE_DIR / "reportes.db"
 LOGO_ALCALDIA = BASE_DIR / "static" / "img" / "logo_alcaldia.jpeg"
 LOGO_INFO     = BASE_DIR / "static" / "img" / "logo_informatica.jpeg"
 (BASE_DIR / "static" / "img").mkdir(parents=True, exist_ok=True)
-
-# ── CREDENCIALES ──────────────────────────────────────────────────────────────
-USUARIOS = {
-    "Admin@2026":   {"rol": "superadmin", "nombre": "Administrador"},
-    "Tecnico@2026": {"rol": "tecnico",    "nombre": "Técnico"},
-}
-CODIGO_SUPERADMIN = "//super_admin"
 
 DEPARTAMENTOS = [
     "Alcaldía (Despacho)", "Administración y Finanzas", "Catastro",
@@ -43,43 +37,93 @@ def get_db():
     con.row_factory = sqlite3.Row
     return con
 
+# ------------------------------------------------------------------------------------------------------------
+#
+#   Tabla usuario separada, cedulas no pueden repetirse, y el sistema de rol de Usuario 
+#
+# ------------------------------------------------------------------------------------------------------------
+
 def init_db():
     con = get_db()
     con.executescript("""
-    CREATE TABLE IF NOT EXISTS reportes (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        numero          TEXT UNIQUE NOT NULL,
-        departamento    TEXT, telf TEXT, usuario_equipo TEXT,
-        codigo_bienes   TEXT,
-        fecha TEXT, tecnico TEXT,
-        equipo TEXT, marca TEXT, modelo TEXT, serial TEXT,
-        chequeo_computador TEXT DEFAULT '[]',
-        chequeo_laptop     TEXT DEFAULT '[]',
-        chequeo_impresora  TEXT DEFAULT '[]',
-        trabajos        TEXT DEFAULT '[]',
-        otros           TEXT,
-        nombre_usuario  TEXT, cargo_usuario TEXT, cedula_usuario TEXT,
-        estado          TEXT DEFAULT 'Recibido',
-        trimestre TEXT, anio INTEGER,
-        fecha_registro  TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS reportes_servicio (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        numero       TEXT NOT NULL,
-        departamento TEXT,
-        fecha        TEXT,
-        fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cedula TEXT UNIQUE NOT NULL,
+            nombre_completo TEXT NOT NULL,
+            cargo TEXT,
+            password_hash TEXT NOT NULL,
+            rol TEXT NOT NULL DEFAULT 'usuario' CHECK(rol IN ('superadmin','admin','usuario')),
+            ultimo_login DATETIME
+        );
+
+        CREATE TABLE IF NOT EXISTS reportes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero TEXT UNIQUE NOT NULL,
+            departamento TEXT,
+            telf TEXT,
+            usuario_equipo TEXT,
+            codigo_bienes TEXT DEFAULT '',
+            fecha TEXT,
+            tecnico TEXT,
+            equipo TEXT,
+            marca TEXT,
+            modelo TEXT,
+            serial TEXT,
+            chequeo_computador TEXT DEFAULT '[]',
+            chequeo_laptop TEXT DEFAULT '[]',
+            chequeo_impresora TEXT DEFAULT '[]',
+            trabajos TEXT DEFAULT '[]',
+            otros TEXT,
+            estado TEXT DEFAULT 'Recibido',
+            trimestre TEXT,
+            anio INTEGER,
+            fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP,
+            nombre_usuario TEXT,
+            cargo_usuario TEXT,
+            cedula_usuario TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS reportes_servicio (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero TEXT NOT NULL,
+            departamento TEXT,
+            fecha TEXT,
+            fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_usuarios_cedula ON usuarios(cedula);
+        CREATE INDEX IF NOT EXISTS idx_usuarios_rol ON usuarios(rol);
     """)
-    # Migración: agregar columna codigo_bienes si no existe
     try:
         con.execute("ALTER TABLE reportes ADD COLUMN codigo_bienes TEXT DEFAULT ''")
         con.commit()
     except:
         pass
-    con.commit(); con.close()
+    con.commit()
+    con.close()
 
-# ── AUTH ──────────────────────────────────────────────────────────────────────
+def verificar_login(cedula, password):
+    con = get_db()
+    user = con.execute("SELECT * FROM usuarios WHERE cedula = ?", (cedula,)).fetchone()
+    con.close()
+    if user and check_password_hash(user['password_hash'], password):
+        return dict(user)
+    return None
+
+def crear_usuario(cedula, nombre, cargo, password_plain, rol='usuario'):
+    con = get_db()
+    try:
+        con.execute("""
+            INSERT INTO usuarios (cedula, nombre_completo, cargo, password_hash, rol)
+            VALUES (?, ?, ?, ?, ?)
+        """, (cedula, nombre, cargo, generate_password_hash(password_plain), rol))
+        con.commit()
+        con.close()
+        return True
+    except sqlite3.IntegrityError:
+        con.close()
+        return False
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -92,21 +136,22 @@ def login_required(f):
 def login():
     if request.method == "POST":
         data = request.json or {}
-        clave = data.get("clave","")
-        # Verificar si es código especial de superadmin
-        if clave == CODIGO_SUPERADMIN:
+        cedula = data.get("cedula","")
+        password = data.get("password","")
+        user = verificar_login(cedula, password)
+        if user:
             session["logged_in"] = True
-            session["rol"] = "superadmin"
-            session["nombre"] = "Administrador"
-            return jsonify({"ok": True, "rol": "superadmin", "nombre": "Administrador"})
-        # Verificar credenciales normales
-        if clave in USUARIOS:
-            u = USUARIOS[clave]
-            session["logged_in"] = True
-            session["rol"] = u["rol"]
-            session["nombre"] = u["nombre"]
-            return jsonify({"ok": True, "rol": u["rol"], "nombre": u["nombre"]})
-        return jsonify({"error": "Clave incorrecta"}), 401
+            session["user_id"] = user["id"]
+            session["rol_usuario"] = user["rol"]
+            session["nombre_usuario"] = user["nombre_completo"]
+            con = get_db()
+            con.execute("UPDATE usuarios SET ultimo_login = ? WHERE id = ?",
+                        (datetime.datetime.now().isoformat(), user["id"]))
+            con.commit()
+            con.close()
+            return jsonify({"ok": True, "rol": user["rol"], "nombre": user["nombre_completo"]})
+        else:
+            return jsonify({"error": "Cédula o contraseña incorrecta"}), 401
     return render_template("login.html")
 
 @app.route("/logout")
@@ -118,13 +163,188 @@ def logout():
 def index():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
-    return render_template("index.html", rol=session.get("rol","tecnico"), nombre=session.get("nombre",""))
+    return render_template("index.html", rol=session.get("rol_usuario","usuario"), nombre=session.get("nombre_usuario",""))
 
 @app.route("/api/me")
 def me():
     if not session.get("logged_in"):
         return jsonify({"logged_in": False})
-    return jsonify({"logged_in": True, "rol": session.get("rol"), "nombre": session.get("nombre")})
+    return jsonify({"logged_in": True, "rol": session.get("rol_usuario"), "nombre": session.get("nombre_usuario")})
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+#   Funcion agregar / modificar / eliminar
+# ---------------------------------------------------------------------------------------------------------------------------  
+#
+#       Superadmin: Control total sobre los demas, crear a otros admins, usuarios, y modificar los valores de los
+#       valores de los otros usuarios.
+#
+#       Admin: Crea, altear, modifica o elimina los datoos de los usuarios, pero su nivel de permisos sobre la base de datos
+#       no es absoluta como el Superadmin.
+#
+#       Usuario: Usuario normal, solo puede cambiar su propia conotraseña
+#
+# ---------------------------------------------------------------------------------------------------------------------------
+
+@app.route("/api/usuarios", methods=["GET"])
+@login_required
+def listar_usuarios():
+    rol_actual = session.get("rol_usuario")
+    if rol_actual not in ("superadmin", "admin"):
+        return jsonify({"error": "No autorizado"}), 403
+    con = get_db()
+    if rol_actual == "superadmin":
+        rows = con.execute("SELECT id, cedula, nombre_completo, cargo, rol, ultimo_login FROM usuarios ORDER BY rol, nombre_completo").fetchall()
+    elif rol_actual == "admin":
+        rows = con.execute("SELECT id, cedula, nombre_completo, cargo, rol, ultimo_login FROM usuarios WHERE rol = 'usuario' ORDER BY nombre_completo").fetchall()
+    con.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/usuarios", methods=["POST"])
+@login_required
+def crear_usuario_api():
+    rol_actual = session.get("rol_usuario")
+    data = request.json or {}
+    cedula = data.get("cedula")
+    nombre = data.get("nombre_completo")
+    cargo = data.get("cargo", "")
+    password = data.get("password")
+    rol = data.get("rol", "usuario")
+    if not cedula or not nombre or not password:
+        return jsonify({"error": "Faltan campos obligatorios"}), 400
+    if rol_actual == "superadmin":
+        if rol not in ("superadmin", "admin", "usuario"):
+            return jsonify({"error": "Rol inválido"}), 400
+        if rol == "superadmin":
+            con = get_db()
+            count = con.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'superadmin'").fetchone()[0]
+            con.close()
+            if count > 0:
+                return jsonify({"error": "Ya existe un superadmin"}), 409
+    elif rol_actual == "admin":
+        if rol != "usuario":
+            return jsonify({"error": "Solo puedes crear usuarios regulares"}), 403
+    else:
+        return jsonify({"error": "No autorizado"}), 403
+    if crear_usuario(cedula, nombre, cargo, password, rol):
+        return jsonify({"ok": True})
+    else:
+        return jsonify({"error": "La cédula ya existe"}), 409
+
+@app.route("/api/usuarios/<int:uid>", methods=["PUT"])
+@login_required
+def actualizar_usuario(uid):
+    rol_actual = session.get("rol_usuario")
+    data = request.json or {}
+    con = get_db()
+    user = con.execute("SELECT * FROM usuarios WHERE id = ?", (uid,)).fetchone()
+    if not user:
+        con.close()
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    user = dict(user)
+    if rol_actual == "superadmin":
+        pass
+    elif rol_actual == "admin":
+        if user["rol"] != "usuario":
+            con.close()
+            return jsonify({"error": "No puedes modificar administradores"}), 403
+    else:
+        con.close()
+        return jsonify({"error": "No autorizado"}), 403
+    if uid == session.get("user_id") and rol_actual == "superadmin":
+        nuevo_rol = data.get("rol", user["rol"])
+        if nuevo_rol != "superadmin":
+            count = con.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'superadmin'").fetchone()[0]
+            if count <= 1:
+                con.close()
+                return jsonify({"error": "No puedes cambiar tu rol, eres el único superadmin"}), 403
+    campos = {}
+    if "cedula" in data: campos["cedula"] = data["cedula"]
+    if "nombre_completo" in data: campos["nombre_completo"] = data["nombre_completo"]
+    if "cargo" in data: campos["cargo"] = data["cargo"]
+    if "password" in data and data["password"]:
+        campos["password_hash"] = generate_password_hash(data["password"])
+    if "rol" in data:
+        nuevo_rol = data["rol"]
+        if nuevo_rol not in ("superadmin", "admin", "usuario"):
+            con.close()
+            return jsonify({"error": "Rol inválido"}), 400
+        if nuevo_rol == "superadmin" and rol_actual == "superadmin":
+            if user["rol"] != "superadmin":
+                count = con.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'superadmin'").fetchone()[0]
+                if count > 0:
+                    con.close()
+                    return jsonify({"error": "Ya existe un superadmin"}), 409
+        elif rol_actual == "admin":
+            if nuevo_rol != "usuario":
+                con.close()
+                return jsonify({"error": "No puedes asignar ese rol"}), 403
+        campos["rol"] = nuevo_rol
+    if campos:
+        sets = ", ".join([f"{k}=?" for k in campos])
+        valores = list(campos.values()) + [uid]
+        try:
+            con.execute(f"UPDATE usuarios SET {sets} WHERE id=?", valores)
+            con.commit()
+        except sqlite3.IntegrityError:
+            con.close()
+            return jsonify({"error": "La cédula ya existe"}), 409
+    con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/usuarios/<int:uid>", methods=["DELETE"])
+@login_required
+def eliminar_usuario(uid):
+    rol_actual = session.get("rol_usuario")
+    if uid == session.get("user_id"):
+        return jsonify({"error": "No puedes eliminarte a ti mismo"}), 403
+    con = get_db()
+    user = con.execute("SELECT * FROM usuarios WHERE id = ?", (uid,)).fetchone()
+    if not user:
+        con.close()
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    user = dict(user)
+    if rol_actual == "superadmin":
+        if user["rol"] == "superadmin":
+            count = con.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'superadmin'").fetchone()[0]
+            if count <= 1:
+                con.close()
+                return jsonify({"error": "No puedes eliminar al único superadmin"}), 403
+    elif rol_actual == "admin":
+        if user["rol"] != "usuario":
+            con.close()
+            return jsonify({"error": "No puedes eliminar administradores"}), 403
+    else:
+        con.close()
+        return jsonify({"error": "No autorizado"}), 403
+    con.execute("DELETE FROM usuarios WHERE id=?", (uid,))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/usuarios/me/password", methods=["PUT"])
+@login_required
+def cambiar_password():
+    data = request.json or {}
+    current = data.get("current_password")
+    new = data.get("new_password")
+    if not current or not new:
+        return jsonify({"error": "Faltan campos"}), 400
+    con = get_db()
+    user = con.execute("SELECT * FROM usuarios WHERE id=?", (session["user_id"],)).fetchone()
+    if not user or not check_password_hash(user["password_hash"], current):
+        con.close()
+        return jsonify({"error": "Contraseña actual incorrecta"}), 403
+    con.execute("UPDATE usuarios SET password_hash=? WHERE id=?", (generate_password_hash(new), session["user_id"]))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+#   Fin de la linea
+# ---------------------------------------------------------------------------------------------------------------------------
 
 @app.route("/api/departamentos")
 def get_departamentos():
@@ -243,7 +463,7 @@ def actualizar(rid):
 @app.route("/api/reportes/<int:rid>", methods=["DELETE"])
 @login_required
 def eliminar(rid):
-    if session.get("rol") != "superadmin":
+    if session.get("rol_usuario") != "superadmin":
         return jsonify({"error":"Solo el administrador puede eliminar reportes"}),403
     con=get_db()
     con.execute("DELETE FROM reportes WHERE id=?",(rid,))
@@ -361,7 +581,6 @@ def pdf_listado_route():
 def siguiente_numero():
     con=get_db()
     anio=datetime.date.today().year
-    # Usar max del número actual para evitar duplicados
     rows=con.execute("SELECT numero FROM reportes WHERE anio=?",(anio,)).fetchall()
     nums=[]
     for row in rows:
@@ -373,9 +592,6 @@ def siguiente_numero():
     con.close()
     return jsonify({"numero":f"RRE-{siguiente:02d}/{str(anio)[2:]}"})
 
-# ══════════════════════════════════════════════════
-#  GENERACIÓN PDF — Formato imagen física
-# ══════════════════════════════════════════════════
 def get_logo_img(path, w, h):
     from reportlab.platypus import Image as RLImg
     if path.exists():
@@ -397,7 +613,7 @@ def generar_pdf(r):
                           topMargin=1.2*cm, bottomMargin=1.2*cm)
     W,H=letter; ancho=W-3*cm
     negro=colors.black
-    azul_titulo=colors.HexColor("#3D1A00")  # marrón oscuro como en la imagen
+    azul_titulo=colors.HexColor("#3D1A00")
     azul_sub=colors.HexColor("#1a4a8a")
     gris_borde=colors.HexColor("#888888")
 
@@ -407,7 +623,6 @@ def generar_pdf(r):
 
     story=[]
 
-    # ── CABECERA (igual a la imagen física) ──────────────────────────────────
     logo_alc  = get_logo_img(LOGO_ALCALDIA, 2.8*cm, 2.8*cm)
     logo_info = get_logo_img(LOGO_INFO, 2.0*cm, 2.0*cm)
 
@@ -437,7 +652,6 @@ def generar_pdf(r):
     ]))
     story+=[hdr, Spacer(1,0.3*cm)]
 
-    # ── CAMPOS DE DATOS ───────────────────────────────────────────────────────
     border_st = TableStyle([
         ("BOX",(0,0),(-1,-1),1,negro),
         ("INNERGRID",(0,0),(-1,-1),0.5,gris_borde),
@@ -466,7 +680,6 @@ def generar_pdf(r):
 
     story.append(campo2("Departamento:",r.get("departamento",""),"Fecha:",r.get("fecha",""),3.2*cm,1.5*cm))
     story.append(Spacer(1,0.05*cm))
-    # Código de bienes municipales
     story.append(campo("código de bienes municipales:", r.get("codigo_bienes",""), 4.8*cm))
     story.append(Spacer(1,0.05*cm))
     story.append(campo2("Equipo:",r.get("equipo",""),"Marca:",r.get("marca",""),2*cm,1.8*cm))
@@ -474,7 +687,6 @@ def generar_pdf(r):
     story.append(campo2("Modelo:",r.get("modelo",""),"Serial:",r.get("serial",""),2*cm,1.8*cm))
     story.append(Spacer(1,0.3*cm))
 
-    # ── CHEQUEO PREVIO ────────────────────────────────────────────────────────
     titulo_chk=Table([[Paragraph("<b>Chequeo Previo</b>",
                                   es("ch",fontSize=13,alignment=TA_CENTER,fontName="Helvetica-Bold"))]],
                      colWidths=[ancho])
@@ -509,7 +721,6 @@ def generar_pdf(r):
                                   ("INNERGRID",(0,0),(-1,-1),1,negro)]))
     story+=[chk_row, Spacer(1,0.3*cm)]
 
-    # ── TRABAJOS REALIZADOS ───────────────────────────────────────────────────
     titulo_tr=Table([[Paragraph("<b>Trabajos Realizados</b>",
                                  es("tr",fontSize=13,alignment=TA_CENTER,fontName="Helvetica-Bold"))]],
                     colWidths=[ancho])
@@ -539,7 +750,6 @@ def generar_pdf(r):
                               ("LEFTPADDING",(0,0),(-1,-1),8)]))
     story.append(trb)
 
-    # Otros
     story.append(Spacer(1,0.1*cm))
     otros_t=Table([[Paragraph("<b>Otros:</b>",es("ol",fontSize=9,fontName="Helvetica-Bold")),
                     Paragraph(str(r.get("otros","") or ""),es("ov",fontSize=9,textColor=azul_sub))]],
@@ -552,14 +762,12 @@ def generar_pdf(r):
     story.append(otros_t)
     story.append(Spacer(1,0.3*cm))
 
-    # ── ÁREA DE FOTO (en blanco, para pegar foto física) ─────────────────────
     foto_box=Table([[Paragraph("",es("fb"))]],colWidths=[ancho])
     foto_box.setStyle(TableStyle([("BOX",(0,0),(-1,-1),1,negro),
                                    ("MINROWHEIGHT",(0,0),(0,0),2.5*cm)]))
     story.append(foto_box)
     story.append(Spacer(1,0.3*cm))
 
-    # ── FIRMAS ────────────────────────────────────────────────────────────────
     firmas=Table([[
         [Paragraph("________________________",es("f1",fontSize=8,alignment=TA_CENTER)),
          Paragraph("Recibe Conforme",es("fl1",fontSize=9,alignment=TA_CENTER,fontName="Helvetica-Bold")),
@@ -584,7 +792,6 @@ def generar_pdf(r):
     doc.build(story)
     buf.seek(0)
     return buf
-
 
 def generar_pdf_resumen(tri, anio):
     from reportlab.lib.pagesizes import A4
@@ -655,7 +862,6 @@ def generar_pdf_resumen(tri, anio):
     doc.build(story)
     buf.seek(0)
     return buf
-
 
 def generar_pdf_listado(rows, filtros=None):
     from reportlab.lib.pagesizes import A4, landscape
@@ -758,7 +964,6 @@ def generar_pdf_listado(rows, filtros=None):
     buf.seek(0)
     return buf
 
-
 def generar_pdf_servicio_blank():
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
@@ -837,9 +1042,14 @@ def generar_pdf_servicio_blank():
     buf.seek(0)
     return buf
 
-
 if __name__ == "__main__":
     init_db()
+    con = get_db()
+    existe = con.execute("SELECT id FROM usuarios WHERE cedula = '12345678'").fetchone()
+    if not existe:
+        crear_usuario('12345678', 'Root', 'Superadmin', 'Admin@2026', 'superadmin')
+        print("Usuario superadmin creado: cédula 12345678 / contraseña Admin@2026")
+    con.close()
     import shutil
     for src, dst in [
         (BASE_DIR/"logo_alcaldia.jpeg", LOGO_ALCALDIA),
@@ -848,7 +1058,7 @@ if __name__ == "__main__":
         if src.exists() and not dst.exists():
             shutil.copy(src, dst)
     print("="*55)
-    print("  Alcaldía Carlos Arvelo - Sistema de Reportes v5.0")
+    print("  Alcaldía Carlos Arvelo - Sistema de Reportes v5.0 (roles usuarios/superadmin/admin)")
     print("  Abrir en: http://localhost:5000")
     print("="*55)
     app.run(debug=False, port=5000, host='0.0.0.0')
