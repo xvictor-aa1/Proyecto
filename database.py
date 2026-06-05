@@ -8,6 +8,19 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # capa de compatibilidad con modulos anteriores debido a que se utilizaba
 # SQL-lite, en lugar de MySQL / MariaDB
 
+class Row(dict):
+    """
+    Diccionario extendido que soporta acceso por índice entero además de por clave.
+    """
+    def __init__(self, row_dict, columns):
+        super().__init__(row_dict)
+        self._tuple = tuple(row_dict[col[0]] for col in columns) if columns else ()
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._tuple[key]
+        return super().__getitem__(key)
+
 class Database:
     def __init__(self, conn):
         self.conn = conn
@@ -100,22 +113,33 @@ def init_db():
             fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
+
+    # ── Tabla auditoría con migración segura ───────────────────────────
+    # 1. Crear la tabla si no existe (con la estructura completa)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS auditoria (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
-            accion VARCHAR(50) NOT NULL,
-            detalle TEXT,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            usuario VARCHAR(150),
+            accion VARCHAR(200) NOT NULL,
+            detalles TEXT,
+            ip VARCHAR(45)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
-    # Indices de Base de Datos -----------------------------------------------------------
+
+    try:
+        cursor.execute("ALTER TABLE auditoria ADD COLUMN timestamp DATETIME DEFAULT CURRENT_TIMESTAMP FIRST")
+    except mysql.connector.errors.ProgrammingError:
+        pass
+
+    try:
+        cursor.execute("CREATE INDEX idx_auditoria_timestamp ON auditoria(timestamp);")
+    except mysql.connector.errors.ProgrammingError:
+        pass
+
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_cedula ON usuarios(cedula);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_rol ON usuarios(rol);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_user ON auditoria(user_id);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria(fecha);")
-    # --------------------------------------------------------------------------
+
     cursor.close()
     conn.close()
 
@@ -146,6 +170,15 @@ def registrar_auditoria(user_id, accion, detalle=""):
     db.execute(
         "INSERT INTO auditoria (user_id, accion, detalle) VALUES (?, ?, ?)",
         (user_id, accion, detalle)
+    )
+    db.commit()
+    db.close()
+
+def insert_audit_log(usuario, accion, detalles, ip=""):
+    db = get_db()
+    db.execute(
+        "INSERT INTO auditoria (usuario, accion, detalles, ip) VALUES (?, ?, ?, ?)",
+        (usuario, accion, detalles, ip)
     )
     db.commit()
     db.close()
