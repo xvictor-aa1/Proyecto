@@ -1,12 +1,12 @@
 from flask import Blueprint, request, jsonify, session, abort, send_file
 from database import get_db
 from modulos.auth import login_required
+from modulos.audit import log_event
 import datetime, json
-# Funcion del Generador de PDF
 from pdf.generator import generar_pdf, generar_pdf_resumen, generar_pdf_listado
-import io
+import mysql.connector
 
-# Modulo principal del Sistema de Reportes
+# Modulo principal del Sistema de Reportee
 reportes_bp = Blueprint('reportes', __name__)
 
 DEPARTAMENTOS = [
@@ -22,6 +22,9 @@ TECNICOS = [
     "Ana Rodríguez", "Luis Hernández", "Pedro González",
     "Sofía Díaz", "Miguel Pérez"
 ]
+
+def _ip():
+    return request.remote_addr or ""
 
 @reportes_bp.route("/departamentos")
 def get_departamentos():
@@ -48,7 +51,10 @@ def listar():
     q+=" ORDER BY fecha_registro DESC"
     rows = db.execute(q, p).fetchall()
     db.close()
-    return jsonify(rows)  # rows ya son dict
+    log_event(session.get("nombre_usuario"), "Consulta listado de reportes",
+              f"Filtros: departamento={dpto}, trimestre={tri}, anio={anio}, búsqueda={busq}",
+              ip=_ip())
+    return jsonify(rows)
 
 @reportes_bp.route("/reportes/<int:rid>", methods=["GET"])
 @login_required
@@ -57,6 +63,7 @@ def obtener(rid):
     r=db.execute("SELECT * FROM reportes WHERE id=?",(rid,)).fetchone()
     db.close()
     if not r: abort(404)
+    log_event(session.get("nombre_usuario"), "Consulta reporte individual", f"ID {rid}", ip=_ip())
     return jsonify(r)
 
 @reportes_bp.route("/reportes", methods=["POST"])
@@ -89,6 +96,9 @@ def crear():
              d.get("estado","Recibido"),d.get("trimestre",tri),d.get("anio",hoy.year)))
         db.commit()
         nid = db.execute("SELECT LAST_INSERT_ID() AS id").fetchone()["id"]
+        log_event(session.get("nombre_usuario"), "Creación de reporte",
+                  f"N° {d['numero']}, dpto {d.get('departamento','')}, equipo {d.get('equipo','')}",
+                  ip=_ip())
         db.close()
         return jsonify({"ok":True,"id":nid})
     except mysql.connector.IntegrityError:
@@ -122,6 +132,8 @@ def actualizar(rid):
          d.get("cedula_usuario",""),
          d.get("estado","Recibido"),d.get("trimestre",tri),d.get("anio",hoy.year),rid))
     db.commit()
+    log_event(session.get("nombre_usuario"), "Actualización de reporte",
+              f"ID {rid}, número {d.get('numero','')}", ip=_ip())
     db.close()
     return jsonify({"ok":True})
 
@@ -133,6 +145,8 @@ def eliminar(rid):
     db=get_db()
     db.execute("DELETE FROM reportes WHERE id=?",(rid,))
     db.commit()
+    log_event(session.get("nombre_usuario"), "Eliminación de reporte",
+              f"ID {rid} eliminado", ip=_ip())
     db.close()
     return jsonify({"ok":True})
 
@@ -143,11 +157,12 @@ def resumen():
     anio=int(request.args.get("anio",datetime.date.today().year))
     db=get_db()
     total =db.execute("SELECT COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=?", (tri,anio)).fetchone()["cnt"]
-    dptos = [ (r["departamento"], r["cnt"]) for r in db.execute("SELECT departamento, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY departamento ORDER BY cnt DESC", (tri,anio)).fetchall() ]
-    equipos=[ (r["equipo"], r["cnt"]) for r in db.execute("SELECT equipo, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY equipo ORDER BY cnt DESC", (tri,anio)).fetchall() ]
-    modelos=[ (r["marca"] + ' ' + r["modelo"], r["cnt"]) for r in db.execute("SELECT marca, modelo, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY marca, modelo ORDER BY cnt DESC", (tri,anio)).fetchall() ]
-    estados=[ (r["estado"], r["cnt"]) for r in db.execute("SELECT estado, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY estado ORDER BY cnt DESC", (tri,anio)).fetchall() ]
+    dptos = [(r["departamento"], r["cnt"]) for r in db.execute("SELECT departamento, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY departamento ORDER BY cnt DESC", (tri,anio)).fetchall()]
+    equipos = [(r["equipo"], r["cnt"]) for r in db.execute("SELECT equipo, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY equipo ORDER BY cnt DESC", (tri,anio)).fetchall()]
+    modelos = [(r["marca"] + ' ' + r["modelo"], r["cnt"]) for r in db.execute("SELECT marca, modelo, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY marca, modelo ORDER BY cnt DESC", (tri,anio)).fetchall()]
+    estados = [(r["estado"], r["cnt"]) for r in db.execute("SELECT estado, COUNT(*) as cnt FROM reportes WHERE trimestre=? AND anio=? GROUP BY estado ORDER BY cnt DESC", (tri,anio)).fetchall()]
     db.close()
+    log_event(session.get("nombre_usuario"), "Consulta resumen", f"Trimestre {tri} año {anio}", ip=_ip())
     return jsonify({"total":total,"dptos":dptos,"equipos":equipos,"modelos":modelos,"estados":estados})
 
 @reportes_bp.route("/siguiente_numero")
@@ -164,6 +179,7 @@ def siguiente_numero():
         except: pass
     db.close()
     siguiente=(max(nums)+1) if nums else 1
+    log_event(session.get("nombre_usuario"), "Solicitar siguiente número", f"{siguiente}", ip=_ip())
     return jsonify({"numero":f"RRE-{siguiente:02d}/{str(anio)[2:]}"})
 
 @reportes_bp.route("/pdf/<int:rid>")
@@ -173,8 +189,34 @@ def pdf_reporte(rid):
     row=db.execute("SELECT * FROM reportes WHERE id=?",(rid,)).fetchone()
     db.close()
     if not row: abort(404)
-    buf=generar_pdf(row)  # row es dict
-    nombre=f"Recepcion_{row['numero'].replace('/','_')}.pdf"
+
+    reporte_numero = row['numero']
+    equipo = row.get('equipo','')
+    marca = row.get('marca','')
+    modelo = row.get('modelo','')
+    estado = row.get('estado','')
+    departamento = row.get('departamento','')
+
+    chequeo_total = 0
+    for campo in ['chequeo_computador','chequeo_laptop','chequeo_impresora']:
+        chequeo_total += len(json.loads(row.get(campo, '[]')))
+    trabajos_total = len(json.loads(row.get('trabajos', '[]')))
+
+    buf=generar_pdf(row)
+
+    log_event(
+        session.get("nombre_usuario"),
+        "Generación de PDF de reporte individual",
+        (
+            f"Reporte N° {reporte_numero} | "
+            f"Equipo: {equipo} | Marca: {marca} {modelo} | "
+            f"Estado: {estado} | Departamento: {departamento} | "
+            f"Chequeos marcados: {chequeo_total} | Trabajos realizados: {trabajos_total}"
+        ),
+        ip=_ip()
+    )
+
+    nombre=f"Recepcion_{reporte_numero.replace('/','_')}.pdf"
     return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=nombre)
 
 @reportes_bp.route("/pdf_resumen")
@@ -183,6 +225,8 @@ def pdf_resumen_route():
     tri =request.args.get("trimestre","T1")
     anio=int(request.args.get("anio",datetime.date.today().year))
     buf=generar_pdf_resumen(tri,anio)
+    log_event(session.get("nombre_usuario"), "Generación PDF resumen",
+              f"Trimestre {tri} año {anio}", ip=_ip())
     nombre=f"Resumen_{tri}_{anio}.pdf"
     return send_file(buf,mimetype="application/pdf",as_attachment=True,download_name=nombre)
 
@@ -205,5 +249,7 @@ def pdf_listado_route():
     db.close()
     filtros={"departamento":dpto,"trimestre":tri,"anio":anio,"buscar":busq}
     buf=generar_pdf_listado(rows, filtros)
+    log_event(session.get("nombre_usuario"), "Generación PDF listado",
+              f"Cantidad: {len(rows)}, filtros: {filtros}", ip=_ip())
     nombre=f"Listado_Reportes_{datetime.date.today().strftime('%d%m%Y')}.pdf"
     return send_file(buf,mimetype="application/pdf",as_attachment=True,download_name=nombre)

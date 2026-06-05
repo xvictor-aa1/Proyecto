@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import datetime
 from functools import wraps
 from config import LOGO_ALCALDIA, LOGO_INFO
+from modulos.audit import log_event
 import base64
 auth_bp = Blueprint('auth', __name__)
 
@@ -99,7 +100,7 @@ def listar_usuarios():
     else:
         rows = db.execute("SELECT id, cedula, nombre_completo, cargo, rol, ultimo_login FROM usuarios WHERE rol = 'usuario' ORDER BY nombre_completo").fetchall()
     db.close()
-    return jsonify(rows)  # rows son dict gracias a dictionary=True
+    return jsonify(rows)
 
 @auth_bp.route("/api/usuarios", methods=["POST"])
 @login_required
@@ -128,6 +129,7 @@ def crear_usuario_api():
     else:
         return jsonify({"error": "No autorizado"}), 403
     if crear_usuario(cedula, nombre, cargo, password, rol):
+        log_event(session.get("nombre_usuario"), "Creación de usuario", f"Cédula {cedula}, nombre {nombre}, rol {rol}")
         return jsonify({"ok": True})
     else:
         return jsonify({"error": "La cédula ya existe"}), 409
@@ -186,6 +188,7 @@ def actualizar_usuario(uid):
         try:
             db.execute(f"UPDATE usuarios SET {sets} WHERE id=?", valores)
             db.commit()
+            log_event(session.get("nombre_usuario"), "Modificación de usuario", f"ID {uid}: campos -> {', '.join(campos.keys())}")
         except mysql.connector.IntegrityError:
             db.close()
             return jsonify({"error": "La cédula ya existe"}), 409
@@ -218,6 +221,7 @@ def eliminar_usuario(uid):
         return jsonify({"error": "No autorizado"}), 403
     db.execute("DELETE FROM usuarios WHERE id=?", (uid,))
     db.commit()
+    log_event(session.get("nombre_usuario"), "Eliminación de usuario", f"ID {uid} ({user['nombre_completo']}) eliminado")
     db.close()
     return jsonify({"ok": True})
 
@@ -236,5 +240,6 @@ def cambiar_password():
         return jsonify({"error": "Contraseña actual incorrecta"}), 403
     db.execute("UPDATE usuarios SET password_hash=? WHERE id=?", (generate_password_hash(new), session["user_id"]))
     db.commit()
+    log_event(session.get("nombre_usuario"), "Cambio de contraseña propia", f"Usuario ID {session['user_id']}")
     db.close()
     return jsonify({"ok": True})
